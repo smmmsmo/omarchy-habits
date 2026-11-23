@@ -135,13 +135,19 @@ function defaultPreview(state, habitId, start, today, answer) {
 }
 function monthGrid(habit, state, year, month, today) {
   if (!habit) return []
+  return calendarDates(year, month).map(function(date) {
+    var cell = cellFor(state, habit, date.key, today)
+    cell.inMonth = date.inMonth
+    return cell
+  })
+}
+function calendarDates(year, month) {
   var first = new Date(year, month, 1, 12)
   var monday = addDays(keyForDate(first), -((first.getDay() + 6) % 7))
   var cells = []
   for (var i = 0; i < 42; i++) {
-    var cell = cellFor(state, habit, addDays(monday, i), today)
-    cell.inMonth = dateFromKey(cell.date).getMonth() === month
-    cells.push(cell)
+    var key = addDays(monday, i)
+    cells.push({ key: key, day: Number(key.slice(-2)), inMonth: dateFromKey(key).getMonth() === month })
   }
   return cells
 }
@@ -229,6 +235,6 @@ if (typeof module !== "undefined" && module.exports) module.exports = {
   addDays: addDays, daysBetween: daysBetween, parseDisplayDate: parseDisplayDate,
   emptyState: emptyState, parseState: parseState, findHabit: findHabit,
   answerFor: answerFor, successFor: successFor, recordFor: recordFor,
-  summaryForDay: summaryForDay, defaultPreview: defaultPreview, monthGrid: monthGrid, heatmapWeeks: heatmapWeeks,
+  summaryForDay: summaryForDay, defaultPreview: defaultPreview, monthGrid: monthGrid, calendarDates: calendarDates, heatmapWeeks: heatmapWeeks,
   analyzeHabit: analyzeHabit, analyze: analyze
 }

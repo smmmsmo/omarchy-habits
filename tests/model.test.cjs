@@ -88,6 +88,10 @@ assert.equal(grid.find(c => c.date === today).state, "pending");
 assert.equal(grid.find(c => c.date === "2026-11-23").automatic, true);
 assert.equal(grid.find(c => c.date === "2026-11-20").selectable, false);
 assert.equal(grid.find(c => c.date === "2026-11-25").state, "future");
+const leapMonth = M.calendarDates(2024, 1);
+assert.equal(leapMonth.filter(c => c.inMonth).length, 29);
+assert.ok(leapMonth.some(c => c.key === "2024-02-29" && c.inMonth));
+assert.equal(M.calendarDates(2026, 11).filter(c => c.inMonth).length, 31);
 assert.equal(M.defaultPreview(state, "htest", "2026-11-20", today, "yes"), 3);
 assert.equal(M.defaultPreview(state, "htest", "2026-11-20", today, ""), 0);
 

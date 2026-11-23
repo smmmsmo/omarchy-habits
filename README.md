@@ -2,7 +2,7 @@
 
 A private, offline bar plugin for building habits and quitting unwanted behaviors. Each habit has its own calendar, check-in, and progress report.
 
-![Calendar and check-in for one of three sample habits](docs/calendar.png)
+![Task, Analysis, and Settings tabs with a check-in and calendar](docs/calendar.png)
 
 ## Install
 
@@ -14,7 +14,7 @@ From a local checkout:
 omarchy plugin validate .
 plugin_dir="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/mo.habits"
 mkdir -p "$plugin_dir"
-install -m 644 manifest.json BarWidget.qml HabitPanel.qml Model.js store.py "$plugin_dir"
+install -m 644 manifest.json BarWidget.qml HabitPanel.qml StartDatePicker.qml Model.js store.py "$plugin_dir"
 install -Dm 644 i18n/en.json "$plugin_dir/i18n/en.json"
 omarchy-shell shell rescanPlugins
 omarchy plugin enable mo.habits --section centerEnd
@@ -24,9 +24,10 @@ Run the same commands to update a manual installation. If the running shell has 
 
 ## Use
 
-- **Left-click** the checkmark to reopen the last habit’s calendar with today selected. **Right-click** to edit that habit. The bar count is today’s on-track habits / all active habits.
+- **Left-click** the checkmark to reopen the last habit’s **Task** tab with today selected. **Right-click** opens its **Settings**. The bar count is today’s on-track habits / all active habits.
 - Choose a habit in the sidebar (or selector on narrow screens). Today’s status is separate for each habit.
-- Use **New habit** to choose the type, starting date, question, optional message, and what to do with untouched days.
+- Use **New habit** to choose the type, starting date, question, optional message, and what to do with untouched days. Edit those same fields later under **Settings**.
+- For the starting date, type `DD MMM YYYY` or select **Choose date**. The picker only allows today and earlier dates.
 - Ask whether the behavior happened. For **Build**, Yes is on track; for **Quit**, No is on track.
 - Click a day to view or change its answer. The month arrows browse history; **Today** returns you to the current date.
 - **Tab** moves between controls. On the calendar, arrow keys move by day or week, **Home** returns to today, and **Enter** focuses the answer. **Esc** leaves editing or closes the popup.

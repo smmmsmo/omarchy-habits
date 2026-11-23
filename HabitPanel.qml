@@ -16,8 +16,10 @@ Panel {
   property string selectedDay: todayKey
   property int viewYear: new Date().getFullYear()
   property int viewMonth: new Date().getMonth()
-  property bool editing: false
-  property string tab: "calendar"
+  property bool creating: false
+  property string tab: "task"
+  property bool datePickerOpen: false
+  property bool saved: false
   property bool saving: false
   property bool deleteArmed: false
   property string editId: ""
@@ -33,6 +35,7 @@ Panel {
   readonly property var trackerState: hostWidget ? hostWidget.trackerState : Model.emptyState()
   readonly property var habit: Model.findHabit(trackerState, selectedId)
     || Model.findHabit(trackerState, trackerState.selectedHabitId) || trackerState.habits[0] || null
+  readonly property bool editing: creating || (tab === "settings" && habit !== null)
   readonly property var stats: opened && habit ? Model.analyzeHabit(habit, trackerState, todayKey) : null
   readonly property string draftDateKey: editing ? parseDate(draftStart) : ""
   readonly property int previewDays: draftDateKey >= "1900-01-01"
@@ -76,15 +79,27 @@ Panel {
       fg.b * amount + bg.b * (1 - amount), 1)
   }
   function chooseHabit(id) {
+    if (saving) return
+    var wasCreating = creating
+    creating = false
     selectedId = id
-    editing = false
+    datePickerOpen = false
+    saved = false
     deleteArmed = false
+    if (wasCreating) tab = "task"
+    if (tab === "settings" && habit) loadDraft(habit)
     inspectDay(todayKey)
     if (hostWidget && typeof hostWidget.rememberHabit === "function") hostWidget.rememberHabit(id)
     if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
   }
   function setTab(next) {
+    if (saving || (!creating && tab === next)) return
+    creating = false
     tab = next
+    datePickerOpen = false
+    saved = false
+    deleteArmed = false
+    if (next === "settings" && habit) loadDraft(habit)
     if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
   }
   function inspectDay(day) {
@@ -106,15 +121,30 @@ Panel {
   }
   function openPage(page) {
     deleteArmed = false
-    saving = false
+    datePickerOpen = false
+    saved = false
     formError = ""
     if (hostWidget && !hostWidget.pendingSelection && !hostWidget.busy) selectedId = ""
-    if (page === "settings") beginEdit(habit)
-    else { editing = false; inspectDay(todayKey); setTab(page) }
+    if (!saving) {
+      creating = false
+      tab = page
+      inspectDay(todayKey)
+      if (page === "settings" && habit) loadDraft(habit)
+      else if (page === "settings" && hostWidget && hostWidget.loaded) beginEdit(null)
+      if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
+    }
     controller.show()
     if (hostWidget) hostWidget.reload()
   }
   function beginEdit(item) {
+    if (saving) return
+    creating = !item
+    tab = item ? "settings" : "task"
+    datePickerOpen = false
+    loadDraft(item)
+    if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
+  }
+  function loadDraft(item) {
     editId = item ? item.id : ""
     draftName = item ? item.name : ""
     draftKind = item ? item.kind : "good"
@@ -122,10 +152,15 @@ Panel {
     draftMessage = item ? item.message : ""
     draftStart = displayDate(item ? item.startDate : todayKey)
     draftDefault = item ? item.defaultAnswer : ""
-    editing = true
+    saved = false
     deleteArmed = false
     formError = ""
-    if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
+  }
+  function cancel() { setTab("task") }
+  function setDraftDate(key) {
+    draftStart = displayDate(key)
+    saved = false
+    datePickerOpen = false
   }
   function save() {
     if (busy) return
@@ -134,6 +169,8 @@ Panel {
     if (!draftQuestion.trim()) { formError = t("questionError"); return }
     if (!start || start < "1900-01-01" || start > todayKey) { formError = t("dateError"); return }
     saving = true
+    saved = false
+    datePickerOpen = false
     formError = ""
     hostWidget.saveHabit({
       id: editId, name: draftName, kind: draftKind, question: draftQuestion,
@@ -180,13 +217,20 @@ Panel {
     function onOperationFinished(action, success, habitId) {
       if ((action === "add" || action === "edit") && root.saving) {
         root.saving = false
-        if (success) root.chooseHabit(habitId)
+        if (success && action === "add") root.chooseHabit(habitId)
+        if (success && action === "edit") {
+          root.selectedId = habitId
+          root.loadDraft(root.habit)
+          root.saved = true
+          if (root.selectedDay < root.habit.startDate) root.inspectDay(root.todayKey)
+        }
       }
       if (action === "delete" && success) {
-        root.editing = false
-        root.deleteArmed = false
+        root.setTab("task")
         root.selectedId = ""
       }
+      if (action === "read" && success && root.tab === "settings" && !root.creating && root.habit && root.editId !== root.habit.id)
+        root.loadDraft(root.habit)
     }
   }
 
@@ -209,7 +253,8 @@ Panel {
       anchors.fill: parent
       focus: true
       Keys.onEscapePressed: {
-        if (root.editing) root.editing = false
+        if (root.datePickerOpen) root.datePickerOpen = false
+        else if (root.editing) root.cancel()
         else root.close()
       }
 
@@ -282,7 +327,7 @@ Panel {
                 height: Style.space(62)
                 text: ""
                 Accessible.name: root.t("habitStatus").arg(modelData.name).arg(root.t(root.todayStatus(modelData)))
-                selected: root.habit && root.habit.id === modelData.id && !root.editing
+                 selected: root.habit && root.habit.id === modelData.id && !root.creating
                 bordered: false
                 onClicked: root.chooseHabit(modelData.id)
                 Column {
@@ -373,7 +418,7 @@ Panel {
           }
 
           Column {
-            visible: root.habit !== null && !root.editing
+            visible: root.habit !== null && !root.creating
             width: parent.width
             spacing: Style.space(14)
             QQC.ComboBox {
@@ -420,8 +465,7 @@ Panel {
               Column {
                 id: habitHeading
                 anchors.left: parent.left
-                anchors.right: headingActions.left
-                anchors.rightMargin: Style.space(16)
+                anchors.right: parent.right
                 spacing: Style.space(9)
                 Label {
                   width: parent.width
@@ -437,14 +481,23 @@ Panel {
                   font.pixelSize: Math.max(11, Style.font.bodySmall)
                 }
               }
-              Row {
-                id: headingActions
-                anchors.right: parent.right
-                spacing: Style.space(6)
-                Action { text: root.t("edit"); onClicked: root.beginEdit(root.habit) }
+            }
+            Flow {
+              width: parent.width
+              spacing: Style.space(8)
+              Repeater {
+                model: ["task", "analysis", "settings"]
+                Action {
+                  required property string modelData
+                  objectName: modelData + "Tab"
+                  text: root.t(modelData)
+                  selected: root.tab === modelData
+                  onClicked: root.setTab(modelData)
+                }
               }
             }
             Row {
+              visible: root.tab !== "settings"
               width: parent.width
               spacing: Style.space(14)
               Stat { width: (parent.width - parent.spacing * 3) / 4; caption: root.t("currentStreak"); value: root.t("streakValue").arg(root.n(root.stats ? root.stats.currentStreak : 0)) }
@@ -452,15 +505,10 @@ Panel {
               Stat { width: (parent.width - parent.spacing * 3) / 4; caption: root.t("onTrackDays"); value: root.stats ? root.n(root.stats.successCount) : "0" }
               Stat { width: (parent.width - parent.spacing * 3) / 4; caption: root.t("setbackDays"); value: root.stats ? root.n(root.stats.failureCount) : "0"; tone: root.stats && root.stats.failureCount ? root.urgent : root.foreground }
             }
-            Row {
-              spacing: Style.space(8)
-              Action { objectName: "calendarTab"; text: root.t("calendar"); selected: root.tab === "calendar"; onClicked: root.setTab("calendar") }
-              Action { objectName: "analysisTab"; text: root.t("analysis"); selected: root.tab === "analysis"; onClicked: root.setTab("analysis") }
-            }
-            CheckIn { id: checkIn; visible: root.tab === "calendar"; width: parent.width }
+            CheckIn { id: checkIn; visible: root.tab === "task"; width: parent.width }
 
             Column {
-              visible: root.tab === "calendar"
+              visible: root.tab === "task"
               width: parent.width
               spacing: Style.space(12)
               Item {
@@ -654,39 +702,98 @@ Panel {
             visible: root.editing
             width: parent.width
             spacing: Style.space(18)
-            Label { text: root.t(root.editId ? "editHabit" : "newHabit"); font.pixelSize: Math.max(22, Style.font.display); font.bold: true }
+            Label { visible: root.creating; text: root.t("newHabit"); font.pixelSize: Math.max(22, Style.font.display); font.bold: true }
             FieldGroup {
               width: parent.width
               label: root.t("habitName")
-              TextField { objectName: "habitName"; width: parent.width; text: root.draftName; onTextEdited: root.draftName = text; maximumLength: 96; foreground: root.foreground; font.pixelSize: Math.max(13, Style.font.body) }
+              DraftField {
+                objectName: "habitName"
+                Accessible.name: root.t("habitName")
+                text: root.draftName
+                onTextEdited: root.draftName = text
+                maximumLength: 96
+              }
             }
             FieldGroup {
               width: parent.width
               label: root.t("habitType")
               Row {
                 spacing: Style.space(8)
-                Action { text: root.t("buildHabit"); selected: root.draftKind === "good"; onClicked: root.draftKind = "good" }
-                Action { text: root.t("quitHabit"); selected: root.draftKind === "bad"; onClicked: root.draftKind = "bad" }
+                Action { text: root.t("buildHabit"); selected: root.draftKind === "good"; onClicked: { root.draftKind = "good"; root.saved = false } }
+                Action { text: root.t("quitHabit"); selected: root.draftKind === "bad"; onClicked: { root.draftKind = "bad"; root.saved = false } }
               }
               Label { width: parent.width; text: root.t(root.draftKind === "bad" ? "badHint" : "goodHint"); wrapMode: Text.Wrap; color: root.dim; font.pixelSize: Math.max(11, Style.font.caption) }
             }
             FieldGroup {
               width: parent.width
               label: root.t("question")
-              TextField { objectName: "habitQuestion"; width: parent.width; text: root.draftQuestion; onTextEdited: root.draftQuestion = text; maximumLength: 256; foreground: root.foreground; font.pixelSize: Math.max(13, Style.font.body) }
+              DraftField {
+                objectName: "habitQuestion"
+                Accessible.name: root.t("question")
+                text: root.draftQuestion
+                onTextEdited: root.draftQuestion = text
+                maximumLength: 256
+              }
             }
             FieldGroup {
               width: parent.width
               label: root.t("message")
-              TextField { objectName: "habitMessage"; width: parent.width; text: root.draftMessage; onTextEdited: root.draftMessage = text; maximumLength: 512; placeholderText: root.t("optional"); foreground: root.foreground; font.pixelSize: Math.max(13, Style.font.body) }
+              DraftField {
+                objectName: "habitMessage"
+                Accessible.name: root.t("message")
+                text: root.draftMessage
+                onTextEdited: root.draftMessage = text
+                maximumLength: 512
+                placeholderText: root.t("optional")
+              }
             }
             FieldGroup {
               width: parent.width
               label: root.t("startingDate")
-              Row {
+              Flow {
+                width: parent.width
                 spacing: Style.space(8)
-                TextField { objectName: "habitStartDate"; width: Style.space(190); text: root.draftStart; onTextEdited: root.draftStart = text; placeholderText: root.displayDate(root.todayKey); foreground: root.foreground; font.pixelSize: Math.max(13, Style.font.body) }
-                Action { text: root.t("today"); onClicked: root.draftStart = root.displayDate(root.todayKey) }
+                DraftField {
+                  objectName: "habitStartDate"
+                  Accessible.name: root.t("startingDate")
+                  width: Math.min(parent.width, Style.space(190))
+                  text: root.draftStart
+                  onTextEdited: root.draftStart = text
+                  placeholderText: root.displayDate(root.todayKey)
+                }
+                Action {
+                  id: chooseDateButton
+                  objectName: "chooseStartDate"
+                  text: root.t(root.datePickerOpen ? "hideDatePicker" : "chooseDate")
+                  selected: root.datePickerOpen
+                  onClicked: root.datePickerOpen = !root.datePickerOpen
+                }
+              }
+              Loader {
+                width: Math.min(parent.width, Style.space(336))
+                active: root.datePickerOpen && root.editing
+                onLoaded: Qt.callLater(function() {
+                  if (item) { root.revealFocus(item); item.focusDays() }
+                })
+                sourceComponent: StartDatePicker {
+                  objectName: "startDatePicker"
+                  initialDate: root.draftDateKey
+                  maximumDate: root.todayKey
+                  locale: root.locale
+                  translations: strings
+                  foreground: root.foreground
+                  accent: root.accent
+                  muted: root.dim
+                  fontFamily: root.fontFamily
+                  onPicked: function(dateKey) {
+                    root.setDraftDate(dateKey)
+                    chooseDateButton.forceActiveFocus()
+                  }
+                  onDismissed: {
+                    root.datePickerOpen = false
+                    chooseDateButton.forceActiveFocus()
+                  }
+                }
               }
             }
             FieldGroup {
@@ -694,9 +801,9 @@ Panel {
               label: root.t("defaultAnswer")
               Row {
                 spacing: Style.space(8)
-                Action { text: root.t("yes"); selected: root.draftDefault === "yes"; onClicked: root.draftDefault = "yes" }
-                Action { text: root.t("no"); selected: root.draftDefault === "no"; onClicked: root.draftDefault = "no" }
-                Action { text: root.t("noDefault"); selected: root.draftDefault === ""; onClicked: root.draftDefault = "" }
+                Action { text: root.t("yes"); selected: root.draftDefault === "yes"; onClicked: { root.draftDefault = "yes"; root.saved = false } }
+                Action { text: root.t("no"); selected: root.draftDefault === "no"; onClicked: { root.draftDefault = "no"; root.saved = false } }
+                Action { text: root.t("noDefault"); selected: root.draftDefault === ""; onClicked: { root.draftDefault = ""; root.saved = false } }
               }
               Label { width: parent.width; text: root.t("defaultHint"); wrapMode: Text.Wrap; color: root.dim; font.pixelSize: Math.max(11, Style.font.caption) }
               Label {
@@ -713,7 +820,13 @@ Panel {
             Row {
               spacing: Style.space(10)
               Action { objectName: "saveHabit"; text: root.t(root.saving ? "saving" : "saveHabit"); selected: true; enabled: !root.busy; onClicked: root.save() }
-              Action { text: root.t("cancel"); enabled: !root.busy; onClicked: root.editing = false }
+              Action { text: root.t("cancel"); enabled: !root.busy; onClicked: root.cancel() }
+              Label {
+                visible: root.saved
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.t("saved")
+                color: root.accent
+              }
             }
             PanelSeparator { visible: root.editId !== ""; foreground: root.foreground }
             Action {
@@ -737,6 +850,13 @@ Panel {
     font.family: root.fontFamily
     font.pixelSize: Math.max(13, Style.font.body)
     lineHeight: 1.2
+  }
+  component DraftField: TextField {
+    width: parent.width
+    foreground: root.foreground
+    font.pixelSize: Math.max(13, Style.font.body)
+    onActiveFocusChanged: if (activeFocus) root.revealFocus(this)
+    onTextEdited: root.saved = false
   }
   component Action: Button {
     foreground: root.foreground

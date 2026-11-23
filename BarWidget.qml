@@ -102,7 +102,7 @@ BarWidget {
 
   readonly property bool opened: popup.opened
   readonly property bool popoutSwitchClosing: popup.popoutSwitchClosing
-  function open() { popup.openPage("calendar") }
+  function open() { popup.openPage("task") }
   function close() { popup.close() }
   function togglePanel() { opened ? close() : open() }
   function closeForPopoutSwitch() { popup.closeForPopoutSwitch() }
@@ -123,7 +123,7 @@ BarWidget {
     function open(): void { root.open() }
     function close(): void { root.close() }
     function toggle(): void { root.togglePanel() }
-    function openToday(): void { popup.openPage("calendar") }
+    function openToday(): void { popup.openPage("task") }
     function openAnalysis(): void { popup.openPage("analysis") }
     function openSettings(): void { popup.openPage("settings") }
     function refresh(): void { root.reload() }
@@ -142,7 +142,7 @@ BarWidget {
     activeColor: Commons.Color.accent
     onPressed: function(b) {
       if (b === Qt.RightButton) popup.openPage("settings")
-      else if (b === Qt.MiddleButton) popup.openPage("calendar")
+      else if (b === Qt.MiddleButton) popup.openPage("task")
       else root.togglePanel()
     }
   }
