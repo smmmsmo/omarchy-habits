@@ -1,4 +1,10 @@
-# 1.3.5 — Date controls and calendar colors
+# 1.4.0 — App settings
+
+The gear opens app-wide preferences, separate from a habit’s Settings tab. New habits can start on the day they’re created or use a fixed date you set. This only fills in the new habit form; existing dates and history aren’t changed.
+
+![App settings with a fixed date for new habits](app-settings.png)
+
+## 1.3.5 — Date controls and calendar colors
 
 Starting dates use separate Day, Month, and Year menus. Each menu closes after selection; the selected date stays valid as the month or year changes. The Analysis calendar now marks on-track days green and setbacks red, with checkmarks and crosses as well as color.
 

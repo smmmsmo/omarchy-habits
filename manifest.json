@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "mo.habits",
   "name": "Habit Tracker",
-  "version": "1.3.5",
+  "version": "1.4.0",
   "author": "mo",
   "license": "MIT",
   "description": "Private yes/no check-ins, monthly calendars, and per-habit recovery analysis.",

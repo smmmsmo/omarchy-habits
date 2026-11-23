@@ -110,6 +110,30 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(data["entries"], {})
         self.assertEqual(data["automatic"], {})
 
+    def test_app_default_applies_to_new_habits_only(self):
+        data, existing = self.add(defaultAnswer="")
+        self.apply(action="answer", id=existing, date=YESTERDAY, value="no")
+        before = self.apply(action="read")
+        after = self.apply(action="setPreferences", defaultStartDate=YESTERDAY)
+        for field in ("habits", "entries", "automatic", "selectedHabitId"):
+            self.assertEqual(before[field], after[field])
+        self.assertEqual(self.apply(action="read")["preferences"]["defaultStartDate"], YESTERDAY)
+        data = self.apply(action="add", name="Uses default", kind="good")
+        self.assertEqual(data["habits"][-1]["startDate"], YESTERDAY)
+        data = self.apply(action="add", name="Overrides default", kind="good", startDate=START)
+        self.assertEqual(data["habits"][-1]["startDate"], START)
+        self.apply(action="setPreferences", defaultStartDate="")
+        data = self.apply(action="add", name="Uses today", kind="good")
+        self.assertEqual(data["habits"][-1]["startDate"], TODAY.isoformat())
+
+    def test_app_default_rejects_invalid_and_future_values(self):
+        self.apply(action="setPreferences", defaultStartDate=START)
+        before = self.path.read_bytes()
+        for day in ("2026-02-30", (TODAY + dt.timedelta(days=1)).isoformat(), None):
+            with self.assertRaises(ValueError):
+                self.apply(action="setPreferences", defaultStartDate=day)
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_selection_survives_reload_without_replacing_the_data_backup(self):
         _, first = self.add()
         _, second = self.add(name="Other")

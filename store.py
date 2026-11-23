@@ -62,6 +62,12 @@ def validate(data):
                for key, answer in answers.items()):
             raise ValueError("Invalid daily answer.")
     if data["version"] == 2:
+        preferences = data.get("preferences", {})
+        if not isinstance(preferences, dict):
+            raise ValueError("Invalid app settings.")
+        default_start = preferences.get("defaultStartDate", "")
+        if default_start != "":
+            date_key(default_start)
         selected = data.get("selectedHabitId", "")
         if selected != "" and (not isinstance(selected, str) or selected not in ids):
             raise ValueError("Invalid selected habit.")
@@ -120,10 +126,10 @@ def restore_default(data, habit, day, today):
         data["automatic"].setdefault(day, {})[identity] = True
 
 
-def habit_fields(operation):
+def habit_fields(operation, default_start, today):
     name = " ".join(str(operation.get("name", "")).split())
     kind = operation.get("kind")
-    start = date_key(operation.get("startDate", dt.date.today().isoformat()))
+    start = date_key(operation.get("startDate", default_start))
     question = " ".join(str(operation.get("question", "Did this behavior happen?")).split())
     message = str(operation.get("message", "")).strip()
     default = operation.get("defaultAnswer", "")
@@ -131,7 +137,7 @@ def habit_fields(operation):
         raise ValueError("Name your habit using 1–96 characters.")
     if kind not in ("good", "bad") or default not in ("", "yes", "no"):
         raise ValueError("Choose the habit type and its Yes/No default.")
-    if start > dt.date.today().isoformat():
+    if start > today:
         raise ValueError("The starting date cannot be in the future.")
     if not question or len(question) > 256 or len(message) > 512:
         raise ValueError("Use a question up to 256 characters and a message up to 512.")
@@ -177,21 +183,30 @@ def transact(path, operation):
         data = read_state(path)
         original = deepcopy(data)
         today = dt.date.today()
+        today_key = today.isoformat()
         data = fill_defaults(migrate(data), today)
         action = operation.get("action")
         if action == "read":
             pass
+        elif action == "setPreferences":
+            start = operation["defaultStartDate"]
+            if start != "" and date_key(start) > today_key:
+                raise ValueError("The starting date cannot be in the future.")
+            preferences = data.get("preferences", {})
+            if preferences.get("defaultStartDate", "") != start:
+                data.setdefault("preferences", {})["defaultStartDate"] = start
         elif action == "add":
             if len(data["habits"]) >= 80:
                 raise ValueError("Up to 80 habits are supported.")
-            habit = dict(id="h" + uuid.uuid4().hex, **habit_fields(operation))
+            start = data.get("preferences", {}).get("defaultStartDate") or today_key
+            habit = dict(id="h" + uuid.uuid4().hex, **habit_fields(operation, min(start, today_key), today_key))
             data["habits"].append(habit)
             data["selectedHabitId"] = habit["id"]
         elif action == "edit":
             habit = next((h for h in data["habits"] if h["id"] == operation.get("id")), None)
             if habit is None:
                 raise ValueError("That habit no longer exists.")
-            habit.update(habit_fields(operation))
+            habit.update(habit_fields(operation, habit["startDate"], today_key))
             data["selectedHabitId"] = habit["id"]
         elif action == "select":
             identity = operation.get("id")
@@ -214,7 +229,7 @@ def transact(path, operation):
             else:
                 day = date_key(operation.get("date"))
                 habit = next(h for h in data["habits"] if h["id"] == identity)
-                if not habit["startDate"] <= day <= today.isoformat():
+                if not habit["startDate"] <= day <= today_key:
                     raise ValueError("Choose a day between your starting date and today.")
                 value = operation.get("value")
                 if value not in ("yes", "no", ""):
@@ -243,7 +258,7 @@ def transact(path, operation):
                     migration_backup = Path(str(path) + ".v1.bak")
                     if not migration_backup.exists():
                         atomic_write(migration_backup, previous)
-                if any(data.get(key) != original.get(key) for key in ("version", "habits", "entries", "automatic")):
+                if any(data.get(key) != original.get(key) for key in ("version", "habits", "entries", "automatic", "preferences")):
                     atomic_write(Path(str(path) + ".bak"), previous)
             atomic_write(path, content)
         return data

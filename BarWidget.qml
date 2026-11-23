@@ -50,6 +50,9 @@ BarWidget {
     operation.action = fields.id ? "edit" : "add"
     operate(operation)
   }
+  function savePreferences(defaultStartDate) {
+    operate({ action: "setPreferences", defaultStartDate: defaultStartDate })
+  }
   function deleteHabit(id) { operate({ action: "delete", id: id }) }
   function setAnswer(id, date, value) {
     operate({ action: "answer", id: id, date: date, value: value })
@@ -126,6 +129,7 @@ BarWidget {
     function openToday(): void { popup.openPage("task") }
     function openAnalysis(): void { popup.openPage("analysis") }
     function openSettings(): void { popup.openPage("settings") }
+    function openAppSettings(): void { popup.openPage("appSettings") }
     function refresh(): void { root.reload() }
   }
 

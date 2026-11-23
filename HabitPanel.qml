@@ -30,12 +30,19 @@ Panel {
   property string draftStart: Model.todayKey()
   property string draftDefault: ""
   property string formError: ""
+  property string returnTab: "task"
+  property string appDraftStart: ""
+  property bool appFixedDate: false
+  property bool appModified: false
+  property bool appSaved: false
 
   readonly property string todayKey: hostWidget ? hostWidget.todayKey : Model.todayKey()
   readonly property var trackerState: hostWidget ? hostWidget.trackerState : Model.emptyState()
   readonly property var habit: Model.findHabit(trackerState, selectedId)
     || Model.findHabit(trackerState, trackerState.selectedHabitId) || trackerState.habits[0] || null
   readonly property bool editing: creating || (tab === "settings" && habit !== null)
+  readonly property bool appSettingsOpen: tab === "appSettings"
+  readonly property string appDefaultStart: trackerState.preferences ? trackerState.preferences.defaultStartDate : ""
   readonly property var stats: opened && habit && tab === "analysis" ? Model.analyzeHabit(habit, trackerState, todayKey) : null
   readonly property int previewDays: editing && draftStart >= "1900-01-01"
     ? Model.defaultPreview(trackerState, editId, draftStart, todayKey, draftDefault) : 0
@@ -102,12 +109,14 @@ Panel {
   }
   function setTab(next, keepDay) {
     if (saving || (!creating && tab === next)) return
+    if (next === "appSettings") returnTab = tab
     creating = false
     tab = next
     saved = false
     deleteArmed = false
     if (next === "task" && !keepDay) inspectDay(todayKey)
     if (next === "settings" && habit) loadDraft(habit)
+    if (next === "appSettings") loadAppDraft()
     if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
   }
   function inspectDay(day) {
@@ -137,6 +146,7 @@ Panel {
       creating = false
       tab = page
       inspectDay(todayKey)
+      if (page === "appSettings") { returnTab = "task"; loadAppDraft() }
       if (page === "settings" && habit) loadDraft(habit)
       else if (page === "settings" && hostWidget && hostWidget.loaded) beginEdit(null)
       if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
@@ -157,7 +167,7 @@ Panel {
     draftKind = item ? item.kind : "good"
     draftQuestion = item ? item.question : t("defaultQuestion")
     draftMessage = item ? item.message : ""
-    draftStart = item ? item.startDate : todayKey
+    draftStart = item ? item.startDate : Model.newHabitStart(trackerState, todayKey)
     draftDefault = item ? item.defaultAnswer : ""
     saved = false
     deleteArmed = false
@@ -167,6 +177,24 @@ Panel {
   function setDraftDate(key) {
     draftStart = key
     saved = false
+  }
+  function loadAppDraft() {
+    appFixedDate = appDefaultStart !== ""
+    appDraftStart = Model.newHabitStart(trackerState, todayKey)
+    appModified = false
+    appSaved = false
+  }
+  function setAppDateMode(fixed) {
+    if (saving || fixed === appFixedDate) return
+    appFixedDate = fixed
+    appModified = true
+    appSaved = false
+  }
+  function saveAppSettings() {
+    if (busy || saving) return
+    saving = true
+    appSaved = false
+    hostWidget.savePreferences(appFixedDate ? appDraftStart : "")
   }
   function save() {
     if (busy) return
@@ -225,6 +253,13 @@ Panel {
     target: root.hostWidget
     ignoreUnknownSignals: true
     function onOperationFinished(action, success, habitId) {
+      if (action === "setPreferences") {
+        root.saving = false
+        if (success) {
+          root.loadAppDraft()
+          root.appSaved = true
+        }
+      }
       if ((action === "add" || action === "edit") && root.saving) {
         root.saving = false
         if (success && action === "add") root.chooseHabit(habitId)
@@ -241,6 +276,8 @@ Panel {
       }
       if (action === "read" && success && root.tab === "settings" && !root.creating && root.habit && root.editId !== root.habit.id)
         root.loadDraft(root.habit)
+      if (action === "read" && success && root.appSettingsOpen && !root.appModified && !root.appSaved)
+        root.loadAppDraft()
     }
   }
 
@@ -260,13 +297,14 @@ Panel {
       id: content
       property alias scrollArea: detailScroll
       readonly property bool multipleHabits: root.trackerState.habits.length > 1
-      readonly property bool showSidebar: multipleHabits && !root.creating && width >= Math.max(500, Style.space(580))
+      readonly property bool showSidebar: multipleHabits && !root.creating && !root.appSettingsOpen && width >= Math.max(500, Style.space(580))
       anchors.fill: parent
       implicitHeight: Math.max(245, bodyTop.y + Math.max(detailColumn.implicitHeight,
         showSidebar ? Math.min(habitList.implicitHeight, Style.space(220)) : 0))
       focus: true
       Keys.onEscapePressed: {
-        if (root.editing) root.cancel()
+        if (root.appSettingsOpen) root.setTab(root.returnTab)
+        else if (root.editing) root.cancel()
         else root.close()
       }
 
@@ -280,7 +318,8 @@ Panel {
           anchors.right: headerActions.left
           anchors.rightMargin: Style.space(12)
           anchors.verticalCenter: parent.verticalCenter
-          text: root.creating ? root.t("newHabit")
+          text: root.appSettingsOpen ? root.t("appSettings")
+            : root.creating ? root.t("newHabit")
             : root.habit && !content.multipleHabits ? root.habit.name : root.t("title")
           font.pixelSize: root.headingSize
           font.weight: Font.DemiBold
@@ -293,8 +332,18 @@ Panel {
           Action {
             text: root.t("newHabit")
             iconText: "+"
-            visible: !root.creating
+            visible: !root.creating && !root.appSettingsOpen
+            enabled: !root.saving
             onClicked: root.beginEdit(null)
+          }
+          Action {
+            objectName: "appSettingsButton"
+            visible: !root.creating && !root.appSettingsOpen
+            enabled: root.hostWidget && root.hostWidget.loaded && !root.saving
+            text: "⚙"
+            Accessible.name: root.t("appSettings")
+            tooltipText: root.t("appSettings")
+            onClicked: root.setTab("appSettings")
           }
           Action { text: "×"; objectName: "closeHabits"; Accessible.name: root.t("close"); onClicked: root.close() }
         }
@@ -406,21 +455,21 @@ Panel {
           }
 
           Column {
-            visible: !root.habit && !root.editing && root.hostWidget && root.hostWidget.loaded
+            visible: !root.habit && !root.editing && !root.appSettingsOpen && root.hostWidget && root.hostWidget.loaded
             width: parent.width
             spacing: Style.space(10)
             Label { width: parent.width; text: root.t("emptyTitle"); font.pixelSize: root.headingSize; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
             Label { width: parent.width; text: root.t("emptyHint"); color: root.dim; wrapMode: Text.Wrap }
           }
           Label {
-            visible: !root.habit && !root.editing && root.hostWidget && !root.hostWidget.loaded && text !== ""
+            visible: !root.habit && !root.editing && !root.appSettingsOpen && root.hostWidget && !root.hostWidget.loaded && text !== ""
             width: parent.width
             text: root.hostWidget && root.hostWidget.storageError ? "" : root.t("loading")
             color: root.dim
           }
 
           Column {
-            visible: root.habit !== null && !root.creating
+            visible: root.habit !== null && !root.creating && !root.appSettingsOpen
             width: parent.width
             spacing: Math.max(13, Style.space(16))
             QQC.ComboBox {
@@ -718,6 +767,90 @@ Panel {
                   color: root.dim
                   wrapMode: Text.Wrap
                 }
+              }
+            }
+          }
+
+          Column {
+            objectName: "appSettingsForm"
+            visible: root.appSettingsOpen
+            width: parent.width
+            spacing: Math.max(16, Style.space(19))
+
+            FieldGroup {
+              width: parent.width
+              label: root.t("appDefaultStart")
+              Label {
+                width: parent.width
+                text: root.t("appDefaultStartHint")
+                wrapMode: Text.Wrap
+                color: root.dim
+              }
+              Flow {
+                width: parent.width
+                spacing: Style.space(8)
+                Choice {
+                  objectName: "appStartToday"
+                  text: root.t("useToday")
+                  active: !root.appFixedDate
+                  enabled: !root.saving
+                  onClicked: root.setAppDateMode(false)
+                }
+                Choice {
+                  objectName: "appStartFixed"
+                  text: root.t("useFixedDate")
+                  active: root.appFixedDate
+                  enabled: !root.saving
+                  onClicked: root.setAppDateMode(true)
+                }
+              }
+              StartDatePicker {
+                objectName: "appStartDatePicker"
+                fieldIdPrefix: "appStartDate"
+                visible: root.appFixedDate
+                enabled: !root.saving
+                width: parent.width
+                dateKey: root.appDraftStart || root.todayKey
+                maximumDate: root.todayKey
+                locale: root.locale
+                translations: strings
+                foreground: root.foreground
+                accent: root.accent
+                surface: root.surface
+                muted: root.dim
+                fontFamily: root.fontFamily
+                bodySize: root.bodySize
+                secondarySize: root.secondarySize
+                onPicked: function(dateKey) {
+                  root.appDraftStart = dateKey
+                  root.appModified = true
+                  root.appSaved = false
+                }
+                onFieldFocused: function(field) { root.revealFocus(field) }
+              }
+            }
+            Flow {
+              width: parent.width
+              spacing: Style.space(10)
+              Action {
+                objectName: "saveAppSettings"
+                text: root.t(root.saving ? "saving" : "saveSettings")
+                active: true
+                enabled: !root.busy && !root.saving && root.appModified
+                onClicked: root.saveAppSettings()
+              }
+              Action {
+                objectName: "backFromAppSettings"
+                text: root.t("back")
+                enabled: !root.saving
+                onClicked: root.setTab(root.returnTab)
+              }
+              Label {
+                visible: root.appSaved
+                height: Style.space(36)
+                verticalAlignment: Text.AlignVCenter
+                text: root.t("saved")
+                color: root.accent
               }
             }
           }

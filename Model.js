@@ -50,7 +50,13 @@ function enumerateDays(start, end) {
   for (var key = start; key <= end && days.length < 100000; key = addDays(key, 1)) days.push(key)
   return days
 }
-function emptyState() { return { version: 2, habits: [], entries: {}, automatic: {}, selectedHabitId: "" } }
+function emptyState() {
+  return { version: 2, habits: [], entries: {}, automatic: {}, selectedHabitId: "", preferences: { defaultStartDate: "" } }
+}
+function newHabitStart(state, today) {
+  var start = state.preferences && state.preferences.defaultStartDate
+  return start && start <= today ? start : today
+}
 function findHabit(state, id) {
   var habits = state && state.habits || []
   for (var i = 0; i < habits.length; i++) if (habits[i].id === id) return habits[i]
@@ -61,6 +67,8 @@ function parseState(raw, fallbackDate) {
   var parsed
   try { parsed = JSON.parse(raw) } catch (error) { return state }
   if (!parsed || !Array.isArray(parsed.habits)) return state
+  var defaultStart = parsed.preferences && parsed.preferences.defaultStartDate
+  if (validKey(defaultStart) && defaultStart >= "1900-01-01") state.preferences.defaultStartDate = defaultStart
   var known = {}
   for (var i = 0; i < parsed.habits.length && i < 80; i++) {
     var h = parsed.habits[i]
@@ -245,7 +253,7 @@ function analyze(state, today) {
 if (typeof module !== "undefined" && module.exports) module.exports = {
   keyForDate: keyForDate, dateFromKey: dateFromKey, validKey: validKey, todayKey: todayKey,
   addDays: addDays, daysBetween: daysBetween, dateParts: dateParts, dateLimits: dateLimits, changeDatePart: changeDatePart,
-  emptyState: emptyState, parseState: parseState, findHabit: findHabit,
+  emptyState: emptyState, newHabitStart: newHabitStart, parseState: parseState, findHabit: findHabit,
   answerFor: answerFor, successFor: successFor, recordFor: recordFor,
   summaryForDay: summaryForDay, defaultPreview: defaultPreview, monthGrid: monthGrid, calendarDates: calendarDates, heatmapWeeks: heatmapWeeks,
   analyzeHabit: analyzeHabit, analyze: analyze
