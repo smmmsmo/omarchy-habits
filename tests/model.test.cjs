@@ -31,11 +31,12 @@ assert.equal(M.changeDatePart("2024-01-31", maximum, "month", 2), "2024-02-29");
 assert.equal(M.changeDatePart("2024-02-29", maximum, "year", 2025), "2025-02-28");
 assert.equal(M.changeDatePart("2025-12-31", maximum, "year", 2026), maximum);
 assert.equal(M.changeDatePart(maximum, maximum, "day", 30), maximum);
-assert.equal(M.newHabitStart(M.emptyState(), maximum), maximum);
-const preferences = M.parseState(JSON.stringify({ habits: [], preferences: { defaultStartDate: "2026-11-01" } }));
-assert.equal(M.newHabitStart(preferences, maximum), "2026-11-01");
-assert.equal(M.newHabitStart(preferences, "2026-10-31"), "2026-10-31");
-assert.equal(M.newHabitStart(M.parseState('{"habits":[],"preferences":{"defaultStartDate":"invalid"}}'), maximum), maximum);
+assert.equal(M.emptyState().preferences.weekStart, 1);
+assert.equal(M.parseState('{"habits":[],"preferences":{"weekStart":6}}').preferences.weekStart, 6);
+assert.equal(M.parseState('{"habits":[],"preferences":{"defaultStartDate":"2026-11-01"}}').preferences.weekStart, 1);
+assert.equal(M.parseState('{"habits":[],"preferences":{"weekStart":"6"}}').preferences.weekStart, 1);
+assert.deepEqual(M.orderedWeekdays(6), [6, 7, 1, 2, 3, 4, 5]);
+assert.deepEqual(M.orderedWeekdays(7), [7, 1, 2, 3, 4, 5, 6]);
 assert.equal(M.addDays("2026-12-31", 1), "2027-01-01");
 assert.equal(M.successFor("bad", "no"), true);
 assert.equal(M.successFor("good", "yes"), true);
@@ -102,6 +103,22 @@ const leapMonth = M.calendarDates(2024, 1);
 assert.equal(leapMonth.filter(c => c.inMonth).length, 29);
 assert.ok(leapMonth.some(c => c.key === "2024-02-29" && c.inMonth));
 assert.equal(M.calendarDates(2026, 11).filter(c => c.inMonth).length, 31);
+for (let first = 1; first <= 7; first++) {
+  const weekdays = M.orderedWeekdays(first);
+  for (const [year, month] of [[2026, 10], [2024, 1], [2026, 11], [2027, 0]]) {
+    const cells = M.calendarDates(year, month, first);
+    assert.equal(cells.length, 42);
+    assert.equal(cells.filter(c => c.inMonth).length, new Date(year, month + 1, 0).getDate());
+    cells.forEach((cell, index) => {
+      assert.equal(M.dateFromKey(cell.key).getDay() || 7, weekdays[index % 7]);
+      if (index > 0) assert.equal(cell.key, M.addDays(cells[index - 1].key, 1));
+    });
+  }
+}
+const saturdayState = { ...state, preferences: { weekStart: 6 } };
+const saturdayGrid = M.monthGrid(state.habits[0], saturdayState, 2026, 10, today);
+assert.equal(saturdayGrid[0].date, "2026-10-31");
+assert.deepEqual(saturdayGrid.find(cell => cell.date === today), grid.find(cell => cell.date === today));
 assert.equal(M.defaultPreview(state, "htest", "2026-11-20", today, "yes"), 3);
 assert.equal(M.defaultPreview(state, "htest", "2026-11-20", today, ""), 0);
 

@@ -50,8 +50,8 @@ BarWidget {
     operation.action = fields.id ? "edit" : "add"
     operate(operation)
   }
-  function savePreferences(defaultStartDate) {
-    operate({ action: "setPreferences", defaultStartDate: defaultStartDate })
+  function savePreferences(weekStart) {
+    operate({ action: "setPreferences", weekStart: weekStart })
   }
   function deleteHabit(id) { operate({ action: "delete", id: id }) }
   function setAnswer(id, date, value) {

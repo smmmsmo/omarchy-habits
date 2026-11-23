@@ -31,8 +31,7 @@ Panel {
   property string draftDefault: ""
   property string formError: ""
   property string returnTab: "task"
-  property string appDraftStart: ""
-  property bool appFixedDate: false
+  property int appDraftWeekStart: 1
   property bool appModified: false
   property bool appSaved: false
 
@@ -42,7 +41,7 @@ Panel {
     || Model.findHabit(trackerState, trackerState.selectedHabitId) || trackerState.habits[0] || null
   readonly property bool editing: creating || (tab === "settings" && habit !== null)
   readonly property bool appSettingsOpen: tab === "appSettings"
-  readonly property string appDefaultStart: trackerState.preferences ? trackerState.preferences.defaultStartDate : ""
+  readonly property int weekStart: Model.weekStartDay(trackerState.preferences && trackerState.preferences.weekStart)
   readonly property var stats: opened && habit && tab === "analysis" ? Model.analyzeHabit(habit, trackerState, todayKey) : null
   readonly property int previewDays: editing && draftStart >= "1900-01-01"
     ? Model.defaultPreview(trackerState, editId, draftStart, todayKey, draftDefault) : 0
@@ -167,7 +166,7 @@ Panel {
     draftKind = item ? item.kind : "good"
     draftQuestion = item ? item.question : t("defaultQuestion")
     draftMessage = item ? item.message : ""
-    draftStart = item ? item.startDate : Model.newHabitStart(trackerState, todayKey)
+    draftStart = item ? item.startDate : todayKey
     draftDefault = item ? item.defaultAnswer : ""
     saved = false
     deleteArmed = false
@@ -179,22 +178,21 @@ Panel {
     saved = false
   }
   function loadAppDraft() {
-    appFixedDate = appDefaultStart !== ""
-    appDraftStart = Model.newHabitStart(trackerState, todayKey)
+    appDraftWeekStart = weekStart
     appModified = false
     appSaved = false
   }
-  function setAppDateMode(fixed) {
-    if (saving || fixed === appFixedDate) return
-    appFixedDate = fixed
-    appModified = true
+  function setAppWeekStart(day) {
+    if (saving || day === appDraftWeekStart) return
+    appDraftWeekStart = day
+    appModified = day !== weekStart
     appSaved = false
   }
   function saveAppSettings() {
     if (busy || saving) return
     saving = true
     appSaved = false
-    hostWidget.savePreferences(appFixedDate ? appDraftStart : "")
+    hostWidget.savePreferences(appDraftWeekStart)
   }
   function save() {
     if (busy) return
@@ -580,9 +578,10 @@ Panel {
                 width: parent.width
                 spacing: Style.space(6)
                 Repeater {
-                  model: [1, 2, 3, 4, 5, 6, 7]
+                  model: Model.orderedWeekdays(root.weekStart)
                   Label {
                     required property int modelData
+                    objectName: "calendarWeekday-" + modelData
                     width: (weekdayRow.width - weekdayRow.spacing * 6) / 7
                     text: root.locale.dayName(modelData, Locale.ShortFormat)
                     color: root.dim
@@ -779,54 +778,28 @@ Panel {
 
             FieldGroup {
               width: parent.width
-              label: root.t("appDefaultStart")
+              label: root.t("weekStartsOn")
               Label {
                 width: parent.width
-                text: root.t("appDefaultStartHint")
+                text: root.t("weekStartHint")
                 wrapMode: Text.Wrap
                 color: root.dim
               }
               Flow {
                 width: parent.width
                 spacing: Style.space(8)
-                Choice {
-                  objectName: "appStartToday"
-                  text: root.t("useToday")
-                  active: !root.appFixedDate
-                  enabled: !root.saving
-                  onClicked: root.setAppDateMode(false)
+                Repeater {
+                  model: [1, 2, 3, 4, 5, 6, 7]
+                  Choice {
+                    required property int modelData
+                    objectName: "weekStart-" + modelData
+                    text: root.locale.dayName(modelData, Locale.LongFormat)
+                    iconText: active ? "✓" : ""
+                    active: root.appDraftWeekStart === modelData
+                    enabled: !root.saving
+                    onClicked: root.setAppWeekStart(modelData)
+                  }
                 }
-                Choice {
-                  objectName: "appStartFixed"
-                  text: root.t("useFixedDate")
-                  active: root.appFixedDate
-                  enabled: !root.saving
-                  onClicked: root.setAppDateMode(true)
-                }
-              }
-              StartDatePicker {
-                objectName: "appStartDatePicker"
-                fieldIdPrefix: "appStartDate"
-                visible: root.appFixedDate
-                enabled: !root.saving
-                width: parent.width
-                dateKey: root.appDraftStart || root.todayKey
-                maximumDate: root.todayKey
-                locale: root.locale
-                translations: strings
-                foreground: root.foreground
-                accent: root.accent
-                surface: root.surface
-                muted: root.dim
-                fontFamily: root.fontFamily
-                bodySize: root.bodySize
-                secondarySize: root.secondarySize
-                onPicked: function(dateKey) {
-                  root.appDraftStart = dateKey
-                  root.appModified = true
-                  root.appSaved = false
-                }
-                onFieldFocused: function(field) { root.revealFocus(field) }
               }
             }
             Flow {

@@ -65,9 +65,7 @@ def validate(data):
         preferences = data.get("preferences", {})
         if not isinstance(preferences, dict):
             raise ValueError("Invalid app settings.")
-        default_start = preferences.get("defaultStartDate", "")
-        if default_start != "":
-            date_key(default_start)
+        validate_week_start(preferences.get("weekStart", 1))
         selected = data.get("selectedHabitId", "")
         if selected != "" and (not isinstance(selected, str) or selected not in ids):
             raise ValueError("Invalid selected habit.")
@@ -80,6 +78,13 @@ def validate(data):
                     for identity, flag in answers.items()):
                 raise ValueError("Invalid automatic-answer record.")
     return data
+
+
+def validate_week_start(value):
+    # ISO weekdays, also used by Qt.locale().dayName(): Monday=1, Sunday=7.
+    if type(value) is not int or not 1 <= value <= 7:
+        raise ValueError("Choose a weekday from Monday through Sunday.")
+    return value
 
 
 def migrate(data):
@@ -189,17 +194,16 @@ def transact(path, operation):
         if action == "read":
             pass
         elif action == "setPreferences":
-            start = operation["defaultStartDate"]
-            if start != "" and date_key(start) > today_key:
-                raise ValueError("The starting date cannot be in the future.")
+            week_start = validate_week_start(operation["weekStart"])
             preferences = data.get("preferences", {})
-            if preferences.get("defaultStartDate", "") != start:
-                data.setdefault("preferences", {})["defaultStartDate"] = start
+            if preferences.get("weekStart", 1) != week_start or "defaultStartDate" in preferences:
+                preferences = data.setdefault("preferences", {})
+                preferences["weekStart"] = week_start
+                preferences.pop("defaultStartDate", None)
         elif action == "add":
             if len(data["habits"]) >= 80:
                 raise ValueError("Up to 80 habits are supported.")
-            start = data.get("preferences", {}).get("defaultStartDate") or today_key
-            habit = dict(id="h" + uuid.uuid4().hex, **habit_fields(operation, min(start, today_key), today_key))
+            habit = dict(id="h" + uuid.uuid4().hex, **habit_fields(operation, today_key, today_key))
             data["habits"].append(habit)
             data["selectedHabitId"] = habit["id"]
         elif action == "edit":

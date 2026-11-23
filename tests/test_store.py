@@ -110,28 +110,32 @@ class StorageTests(unittest.TestCase):
         self.assertEqual(data["entries"], {})
         self.assertEqual(data["automatic"], {})
 
-    def test_app_default_applies_to_new_habits_only(self):
+    def test_week_start_persists_without_changing_habits_or_history(self):
         data, existing = self.add(defaultAnswer="")
         self.apply(action="answer", id=existing, date=YESTERDAY, value="no")
         before = self.apply(action="read")
-        after = self.apply(action="setPreferences", defaultStartDate=YESTERDAY)
-        for field in ("habits", "entries", "automatic", "selectedHabitId"):
-            self.assertEqual(before[field], after[field])
-        self.assertEqual(self.apply(action="read")["preferences"]["defaultStartDate"], YESTERDAY)
-        data = self.apply(action="add", name="Uses default", kind="good")
-        self.assertEqual(data["habits"][-1]["startDate"], YESTERDAY)
-        data = self.apply(action="add", name="Overrides default", kind="good", startDate=START)
-        self.assertEqual(data["habits"][-1]["startDate"], START)
-        self.apply(action="setPreferences", defaultStartDate="")
-        data = self.apply(action="add", name="Uses today", kind="good")
-        self.assertEqual(data["habits"][-1]["startDate"], TODAY.isoformat())
+        for day in range(7, 0, -1):
+            after = self.apply(action="setPreferences", weekStart=day)
+            for field in ("habits", "entries", "automatic", "selectedHabitId"):
+                self.assertEqual(before[field], after[field])
+            self.assertEqual(self.apply(action="read")["preferences"]["weekStart"], day)
 
-    def test_app_default_rejects_invalid_and_future_values(self):
-        self.apply(action="setPreferences", defaultStartDate=START)
+    def test_old_default_date_is_ignored_and_replaced(self):
+        data, _ = self.add(defaultAnswer="")
+        data["preferences"] = {"defaultStartDate": START, "unrelatedPreference": True}
+        self.path.write_text(json.dumps(data))
+        created = self.apply(action="add", name="Uses today", kind="good")
+        self.assertEqual(created["habits"][-1]["startDate"], TODAY.isoformat())
+        updated = self.apply(action="setPreferences", weekStart=6)
+        self.assertEqual(updated["preferences"], {"weekStart": 6, "unrelatedPreference": True})
+        self.assertEqual(updated["habits"], created["habits"])
+
+    def test_week_start_rejects_invalid_values(self):
+        self.apply(action="setPreferences", weekStart=6)
         before = self.path.read_bytes()
-        for day in ("2026-02-30", (TODAY + dt.timedelta(days=1)).isoformat(), None):
+        for day in (-1, 0, 8, "6", True, 6.5, None):
             with self.assertRaises(ValueError):
-                self.apply(action="setPreferences", defaultStartDate=day)
+                self.apply(action="setPreferences", weekStart=day)
         self.assertEqual(self.path.read_bytes(), before)
 
     def test_selection_survives_reload_without_replacing_the_data_backup(self):

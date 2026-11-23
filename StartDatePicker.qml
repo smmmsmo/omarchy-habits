@@ -18,7 +18,6 @@ Flow {
   property string fontFamily: Style.font.family
   property int bodySize: Style.font.body
   property int secondarySize: Style.font.bodySmall
-  property string fieldIdPrefix: "startDate"
 
   readonly property var maximum: Model.dateParts(maximumDate)
   readonly property var current: Model.dateParts(dateKey) || maximum
@@ -47,7 +46,7 @@ Flow {
     width: Math.min(picker.width, Math.max(255, Style.space(306)))
 
     DateField {
-      objectName: picker.fieldIdPrefix + "Day"
+      objectName: "startDateDay"
       title: picker.translations.t("day")
       width: fields.fieldSpace * 0.23
       model: picker.makeOptions(1, picker.limits.day, 1, picker.numberLabel)
@@ -55,7 +54,7 @@ Flow {
       onActivated: function(index) { popup.close(); picker.selectPart("day", model[index].key) }
     }
     DateField {
-      objectName: picker.fieldIdPrefix + "Month"
+      objectName: "startDateMonth"
       title: picker.translations.t("month")
       width: fields.fieldSpace * 0.48
       model: picker.makeOptions(1, picker.limits.month, 1,
@@ -64,7 +63,7 @@ Flow {
       onActivated: function(index) { popup.close(); picker.selectPart("month", model[index].key) }
     }
     DateField {
-      objectName: picker.fieldIdPrefix + "Year"
+      objectName: "startDateYear"
       title: picker.translations.t("year")
       width: fields.fieldSpace * 0.29
       model: picker.makeOptions(picker.maximum.year, 1900, -1,
@@ -79,7 +78,7 @@ Flow {
     height: fields.height
     Button {
       id: todayButton
-      objectName: picker.fieldIdPrefix + "Today"
+      objectName: "startDateToday"
       anchors.bottom: parent.bottom
       text: picker.translations.t("today")
       enabled: picker.dateKey !== picker.maximumDate

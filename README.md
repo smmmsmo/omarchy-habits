@@ -28,7 +28,7 @@ Run the same commands to update a manual installation. If the running shell has 
 - Choose a habit in the sidebar (or selector on narrow screens). Today’s status is separate for each habit.
 - Use **New habit** to choose the type, starting date, question, optional message, and what to do with untouched days. Edit those same fields later under **Settings**.
 - For the starting date, choose **Day**, **Month**, and **Year**, or use **Today**. Only today and earlier dates can be selected.
-- The gear opens **App settings**. Set a fixed default starting date for new habits or keep **Use today**. This never changes existing habits, and you can override the default when you create a habit.
+- The gear opens **App settings**. Use **Week starts on** to set the first column of every Analysis calendar. Monday is the default; any weekday works. This does not change habit dates or answers.
 - Ask whether the behavior happened. For **Build**, Yes is on track; for **Quit**, No is on track.
 - Open **Analysis** for the calendar. Select a day and choose **Edit answer** or **Check in** to answer for that date in **Task**.
 - **Show progress & recovery** opens the selected habit’s streaks, 7-day, 30-day, and since-start rates, manual and automatic counts, and recovery details.

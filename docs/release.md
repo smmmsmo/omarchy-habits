@@ -1,8 +1,12 @@
-# 1.4.0 — App settings
+# 1.4.1 — First weekday
+
+**App settings → Week starts on** sets the first column of every Analysis calendar. Any of the seven weekdays can be selected. Monday is the default. This replaces the app-wide habit start date; per-habit dates and history are unchanged.
+
+![App settings with Saturday selected as the first weekday](app-settings.png)
+
+## 1.4.0 — App settings
 
 The gear opens app-wide preferences, separate from a habit’s Settings tab. New habits can start on the day they’re created or use a fixed date you set. This only fills in the new habit form; existing dates and history aren’t changed.
-
-![App settings with a fixed date for new habits](app-settings.png)
 
 ## 1.3.5 — Date controls and calendar colors
 

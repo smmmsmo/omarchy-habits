@@ -51,11 +51,17 @@ function enumerateDays(start, end) {
   return days
 }
 function emptyState() {
-  return { version: 2, habits: [], entries: {}, automatic: {}, selectedHabitId: "", preferences: { defaultStartDate: "" } }
+  return { version: 2, habits: [], entries: {}, automatic: {}, selectedHabitId: "", preferences: { weekStart: 1 } }
 }
-function newHabitStart(state, today) {
-  var start = state.preferences && state.preferences.defaultStartDate
-  return start && start <= today ? start : today
+function weekStartDay(value) {
+  return Number.isInteger(value) && value >= 1 && value <= 7 ? value : 1
+}
+function orderedWeekdays(weekStart) {
+  var first = weekStartDay(weekStart)
+  return [0, 1, 2, 3, 4, 5, 6].map(function(offset) { return (first - 1 + offset) % 7 + 1 })
+}
+function weekOffset(date, weekStart) {
+  return (date.getDay() + 7 - (weekStartDay(weekStart) % 7)) % 7
 }
 function findHabit(state, id) {
   var habits = state && state.habits || []
@@ -67,8 +73,7 @@ function parseState(raw, fallbackDate) {
   var parsed
   try { parsed = JSON.parse(raw) } catch (error) { return state }
   if (!parsed || !Array.isArray(parsed.habits)) return state
-  var defaultStart = parsed.preferences && parsed.preferences.defaultStartDate
-  if (validKey(defaultStart) && defaultStart >= "1900-01-01") state.preferences.defaultStartDate = defaultStart
+  state.preferences.weekStart = weekStartDay(parsed.preferences && parsed.preferences.weekStart)
   var known = {}
   for (var i = 0; i < parsed.habits.length && i < 80; i++) {
     var h = parsed.habits[i]
@@ -155,29 +160,29 @@ function defaultPreview(state, habitId, start, today, answer) {
 }
 function monthGrid(habit, state, year, month, today) {
   if (!habit) return []
-  return calendarDates(year, month).map(function(date) {
+  return calendarDates(year, month, state.preferences && state.preferences.weekStart).map(function(date) {
     var cell = cellFor(state, habit, date.key, today)
     cell.inMonth = date.inMonth
     return cell
   })
 }
-function calendarDates(year, month) {
+function calendarDates(year, month, weekStart) {
   var first = new Date(year, month, 1, 12)
-  var monday = addDays(keyForDate(first), -((first.getDay() + 6) % 7))
+  var firstCell = addDays(keyForDate(first), -weekOffset(first, weekStart))
   var cells = []
   for (var i = 0; i < 42; i++) {
-    var key = addDays(monday, i)
+    var key = addDays(firstCell, i)
     cells.push({ key: key, day: Number(key.slice(-2)), inMonth: dateFromKey(key).getMonth() === month })
   }
   return cells
 }
 function heatmapWeeks(habit, state, today, count) {
   var date = dateFromKey(today)
-  var monday = addDays(today, -(count - 1) * 7 - ((date.getDay() + 6) % 7))
+  var firstCell = addDays(today, -(count - 1) * 7 - weekOffset(date, state.preferences && state.preferences.weekStart))
   var weeks = []
   for (var w = 0; w < count; w++) {
     var row = []
-    for (var d = 0; d < 7; d++) row.push(cellFor(state, habit, addDays(monday, w * 7 + d), today))
+    for (var d = 0; d < 7; d++) row.push(cellFor(state, habit, addDays(firstCell, w * 7 + d), today))
     weeks.push(row)
   }
   return weeks
@@ -253,7 +258,7 @@ function analyze(state, today) {
 if (typeof module !== "undefined" && module.exports) module.exports = {
   keyForDate: keyForDate, dateFromKey: dateFromKey, validKey: validKey, todayKey: todayKey,
   addDays: addDays, daysBetween: daysBetween, dateParts: dateParts, dateLimits: dateLimits, changeDatePart: changeDatePart,
-  emptyState: emptyState, newHabitStart: newHabitStart, parseState: parseState, findHabit: findHabit,
+  emptyState: emptyState, weekStartDay: weekStartDay, orderedWeekdays: orderedWeekdays, parseState: parseState, findHabit: findHabit,
   answerFor: answerFor, successFor: successFor, recordFor: recordFor,
   summaryForDay: summaryForDay, defaultPreview: defaultPreview, monthGrid: monthGrid, calendarDates: calendarDates, heatmapWeeks: heatmapWeeks,
   analyzeHabit: analyzeHabit, analyze: analyze
