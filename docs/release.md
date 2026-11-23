@@ -1,4 +1,10 @@
-# 1.3.1 — Smaller popup
+# 1.3.2 — Compact typography
+
+The popup uses Adwaita Sans when installed, with a system sans-serif fallback. A shared scale covers 13 px supporting text, 15 px body and navigation, 16 px Yes/No, 20 px headings, and 24 px questions and key numbers. These are logical pixels and grow with larger Omarchy fonts. The compact popup width is unchanged.
+
+References: [OpenAI’s frontend design guide](https://developers.openai.com/blog/designing-delightful-frontends-with-gpt-5-4), [OpenAI’s UI guidelines](https://developers.openai.com/apps-sdk/concepts/design-guidelines), and [Anthropic’s frontend-design skill](https://github.com/anthropics/skills/blob/main/skills/frontend-design/SKILL.md). The sizes are local design decisions, not sizes prescribed by those guides.
+
+## 1.3.1 — Smaller popup
 
 The popup is about one-third narrower at the previous default size. Padding and row heights are smaller, while body text and the three-tab layout are unchanged.
 

@@ -46,13 +46,17 @@ Panel {
   readonly property color foreground: Commons.Color.popups.text
   readonly property color accent: Commons.Color.accent
   readonly property color urgent: Commons.Color.urgent
-  readonly property color dim: blend(foreground, Commons.Color.popups.background, 0.86)
+  readonly property color surface: Commons.Color.popups.background
+  readonly property color dim: readable(blend(foreground, surface, 0.8), surface)
   readonly property bool busy: !hostWidget || hostWidget.busy || !hostWidget.loaded
-  // The popup is mostly prose and form controls, not bar readouts.
-  readonly property string fontFamily: "sans-serif"
-  readonly property int bodySize: Math.max(15, Style.font.body + 1)
-  readonly property int secondarySize: Math.max(14, Style.font.bodySmall + 1)
-  readonly property int headingSize: Math.max(22, Style.font.heading)
+  // Keep the bar's monospace glyphs separate from the popup's prose and controls.
+  readonly property string fontFamily: Qt.fontFamilies().indexOf("Adwaita Sans") >= 0 ? "Adwaita Sans" : "sans-serif"
+  readonly property real typeScale: Math.max(1, Style.fontScale)
+  readonly property int secondarySize: typeSize(13)
+  readonly property int bodySize: typeSize(15)
+  readonly property int answerSize: typeSize(16)
+  readonly property int headingSize: typeSize(20)
+  readonly property int displaySize: typeSize(24)
   readonly property var locale: Qt.locale(Commons.I18n.formatLocale)
 
   Commons.Translations {
@@ -78,10 +82,21 @@ Panel {
     }
   }
   function pct(rate, count) { return count ? n(Math.round(rate * 100)) + "%" : "—" }
+  function typeSize(size) { return Math.round(size * typeScale) }
   function tint(color, opacity) { return Qt.rgba(color.r, color.g, color.b, opacity) }
   function blend(fg, bg, amount) {
     return Qt.rgba(fg.r * amount + bg.r * (1 - amount), fg.g * amount + bg.g * (1 - amount),
       fg.b * amount + bg.b * (1 - amount), 1)
+  }
+  // Keep text legible when a theme's accent is suitable for marks but not text.
+  function luminance(color) {
+    function linear(c) { return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4) }
+    return 0.2126 * linear(color.r) + 0.7152 * linear(color.g) + 0.0722 * linear(color.b)
+  }
+  function readable(tone, background) {
+    var ink = luminance(tone)
+    var fill = luminance(background)
+    return (Math.max(ink, fill) + 0.05) / (Math.min(ink, fill) + 0.05) >= 4.5 ? tone : foreground
   }
   function chooseHabit(id) {
     if (saving) return
@@ -275,15 +290,16 @@ Panel {
       Item {
         id: header
         width: parent.width
-        height: Math.max(36, Style.space(40))
+        height: Math.max(headerActions.implicitHeight, Style.space(40))
         Label {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
           text: root.t("title")
           font.pixelSize: root.headingSize
-          font.bold: true
+          font.weight: Font.DemiBold
         }
         Row {
+          id: headerActions
           anchors.right: parent.right
           spacing: Style.space(8)
           Action {
@@ -316,7 +332,7 @@ Panel {
           text: root.t("yourHabits")
           color: root.dim
           font.pixelSize: root.secondarySize
-          font.bold: true
+          font.weight: Font.DemiBold
         }
         Flickable {
           objectName: "habitsScroll"
@@ -338,7 +354,7 @@ Panel {
                 id: habitButton
                 required property var modelData
                 width: habitList.width
-                height: Math.max(40, Style.space(45))
+                height: Math.max(40, root.bodySize + Style.space(20))
                 text: ""
                 Accessible.name: root.t("habitStatus").arg(modelData.name).arg(root.t(root.todayStatus(modelData)))
                  selected: root.habit && root.habit.id === modelData.id && !root.creating
@@ -353,7 +369,7 @@ Panel {
                   Label {
                     width: Math.max(0, parent.width - Style.space(21))
                     text: habitButton.modelData.name
-                    font.bold: habitButton.selected
+                     font.weight: habitButton.selected ? Font.DemiBold : Font.Normal
                     elide: Text.ElideRight
                   }
                 }
@@ -413,7 +429,7 @@ Panel {
             width: parent.width
             spacing: Style.space(20)
             Item { width: 1; height: Style.space(70) }
-            Label { text: root.t("emptyTitle"); font.pixelSize: Math.max(22, Style.font.display); font.bold: true }
+            Label { width: parent.width; text: root.t("emptyTitle"); font.pixelSize: root.displaySize; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
             Label { width: parent.width; text: root.t("emptyHint"); color: root.dim; wrapMode: Text.Wrap }
             Action { text: root.t("createFirst"); onClicked: root.beginEdit(null) }
           }
@@ -479,8 +495,8 @@ Panel {
                   width: parent.width
                   text: root.habit ? root.habit.name : ""
                   wrapMode: Text.Wrap
-                  font.pixelSize: Math.max(24, Style.font.display)
-                  font.bold: true
+                  font.pixelSize: root.headingSize
+                  font.weight: Font.DemiBold
                 }
               }
             }
@@ -494,7 +510,7 @@ Panel {
                   objectName: modelData + "Tab"
                   text: ""
                   width: tabLabel.implicitWidth + 2 * Math.max(12, Style.space(14))
-                  height: Math.max(35, Style.space(40))
+                  height: Math.max(tabLabel.implicitHeight + Style.space(14), Style.space(40))
                   Accessible.role: Accessible.PageTab
                   Accessible.name: root.t(modelData)
                   Accessible.selected: selected
@@ -505,7 +521,7 @@ Panel {
                     id: tabLabel
                     anchors.centerIn: parent
                     text: root.t(modelData)
-                    font.bold: parent.selected
+                    font.weight: parent.selected ? Font.DemiBold : Font.Normal
                   }
                 }
               }
@@ -532,7 +548,7 @@ Panel {
                   anchors.verticalCenter: parent.verticalCenter
                   text: root.locale.toString(new Date(root.viewYear, root.viewMonth, 1, 12), "MMMM yyyy")
                   font.pixelSize: root.headingSize
-                  font.bold: true
+                  font.weight: Font.DemiBold
                   elide: Text.ElideRight
                 }
                 Row {
@@ -593,7 +609,7 @@ Panel {
                     readonly property bool failure: modelData.state === "failure"
                     readonly property color tone: success ? root.accent : failure ? root.urgent : root.foreground
                     width: (calendar.width - calendar.spacing * 6) / 7
-                    height: Math.max(34, Style.space(40))
+                    height: Math.max(34, root.bodySize + Style.space(16), Style.space(40))
                     radius: Style.cornerRadius > 0 ? Math.min(Style.cornerRadius, Style.space(5)) : 0
                     opacity: !modelData.inMonth ? 0 : modelData.source === "before" || modelData.source === "future" ? 0.38 : 1
                     color: success || failure ? root.tint(tone, 0.16)
@@ -609,8 +625,10 @@ Panel {
                     Label {
                       anchors.centerIn: parent
                       text: root.n(cell.modelData.day)
-                      color: cell.success || cell.failure ? cell.tone : root.foreground
-                      font.bold: cell.modelData.today
+                      color: cell.success || cell.failure
+                        ? root.readable(cell.tone, root.blend(cell.tone, root.surface, 0.16))
+                        : root.foreground
+                      font.weight: cell.modelData.today ? Font.DemiBold : Font.Normal
                     }
                     Label {
                       anchors.right: parent.right
@@ -618,7 +636,7 @@ Panel {
                       anchors.verticalCenter: parent.verticalCenter
                       text: cell.failure ? "×" : cell.success ? "✓" : ""
                       color: cell.tone
-                      font.pixelSize: Math.max(12, Style.font.bodySmall)
+                      font.pixelSize: root.secondarySize
                     }
                     Rectangle {
                       visible: cell.modelData.automatic
@@ -674,7 +692,7 @@ Panel {
                 objectName: "progressDetails"
                 text: root.t(root.detailsOpen ? "hideProgress" : "showProgress")
                 bordered: false
-                selected: root.detailsOpen
+                active: root.detailsOpen
                 onClicked: {
                   root.detailsOpen = !root.detailsOpen
                   if (root.detailsOpen) Qt.callLater(function() { root.revealFocus(progressHeading) })
@@ -688,7 +706,7 @@ Panel {
               width: parent.width
               spacing: Math.max(16, Style.space(19))
               PanelSeparator { foreground: root.foreground }
-              Label { id: progressHeading; text: root.t("progress"); font.bold: true; font.pixelSize: root.headingSize }
+              Label { id: progressHeading; text: root.t("progress"); font.weight: Font.DemiBold; font.pixelSize: root.headingSize }
               Row {
                 width: parent.width
                 spacing: Style.space(14)
@@ -696,7 +714,7 @@ Panel {
                 Stat { width: (parent.width - parent.spacing * 2) / 3; caption: root.t("bestStreak"); value: root.t("streakValue").arg(root.n(root.stats ? root.stats.bestStreak : 0)) }
                 Stat { width: (parent.width - parent.spacing * 2) / 3; caption: root.t("setbackDays"); value: root.n(root.stats ? root.stats.failureCount : 0); tone: root.stats && root.stats.failureCount ? root.urgent : root.foreground }
               }
-              Label { text: root.t("successRate"); font.bold: true }
+              Label { text: root.t("successRate"); font.weight: Font.DemiBold }
               Row {
                 width: parent.width
                 spacing: Style.space(12)
@@ -711,14 +729,14 @@ Panel {
                 wrapMode: Text.Wrap
               }
               PanelSeparator { foreground: root.foreground }
-              Label { text: root.t("recovery"); font.bold: true; font.pixelSize: root.headingSize }
+              Label { text: root.t("recovery"); font.weight: Font.DemiBold; font.pixelSize: root.headingSize }
               Column {
                 width: parent.width
                 spacing: Style.space(10)
                 Label {
                   width: parent.width
                   text: root.recoveryText()
-                  color: root.stats && root.stats.pendingRecovery ? root.urgent : root.foreground
+                  color: root.stats && root.stats.pendingRecovery ? root.readable(root.urgent, root.surface) : root.foreground
                   wrapMode: Text.Wrap
                 }
                 Label {
@@ -757,7 +775,7 @@ Panel {
             visible: root.editing
             width: parent.width
             spacing: Math.max(17, Style.space(20))
-            Label { visible: root.creating; text: root.t("newHabit"); font.pixelSize: root.headingSize; font.bold: true }
+            Label { visible: root.creating; text: root.t("newHabit"); font.pixelSize: root.headingSize; font.weight: Font.DemiBold }
             FieldGroup {
               width: parent.width
               label: root.t("habitName")
@@ -775,8 +793,8 @@ Panel {
               Flow {
                 width: parent.width
                 spacing: Style.space(8)
-                Action { text: root.t("buildHabit"); selected: root.draftKind === "good"; onClicked: { root.draftKind = "good"; root.saved = false } }
-                Action { text: root.t("quitHabit"); selected: root.draftKind === "bad"; onClicked: { root.draftKind = "bad"; root.saved = false } }
+                Choice { text: root.t("buildHabit"); active: root.draftKind === "good"; onClicked: { root.draftKind = "good"; root.saved = false } }
+                Choice { text: root.t("quitHabit"); active: root.draftKind === "bad"; onClicked: { root.draftKind = "bad"; root.saved = false } }
               }
               Label { width: parent.width; text: root.t(root.draftKind === "bad" ? "badHint" : "goodHint"); wrapMode: Text.Wrap; color: root.dim; font.pixelSize: root.secondarySize }
             }
@@ -821,7 +839,7 @@ Panel {
                   id: chooseDateButton
                   objectName: "chooseStartDate"
                   text: root.t(root.datePickerOpen ? "hideDatePicker" : "chooseDate")
-                  selected: root.datePickerOpen
+                  active: root.datePickerOpen
                   onClicked: root.datePickerOpen = !root.datePickerOpen
                 }
               }
@@ -841,6 +859,8 @@ Panel {
                   accent: root.accent
                   muted: root.dim
                   fontFamily: root.fontFamily
+                  bodySize: root.bodySize
+                  secondarySize: root.secondarySize
                   onPicked: function(dateKey) {
                     root.setDraftDate(dateKey)
                     chooseDateButton.forceActiveFocus()
@@ -858,9 +878,9 @@ Panel {
               Flow {
                 width: parent.width
                 spacing: Style.space(8)
-                Action { text: root.t("yes"); selected: root.draftDefault === "yes"; onClicked: { root.draftDefault = "yes"; root.saved = false } }
-                Action { text: root.t("no"); selected: root.draftDefault === "no"; onClicked: { root.draftDefault = "no"; root.saved = false } }
-                Action { text: root.t("noDefault"); selected: root.draftDefault === ""; onClicked: { root.draftDefault = ""; root.saved = false } }
+                Choice { text: root.t("yes"); active: root.draftDefault === "yes"; onClicked: { root.draftDefault = "yes"; root.saved = false } }
+                Choice { text: root.t("no"); active: root.draftDefault === "no"; onClicked: { root.draftDefault = "no"; root.saved = false } }
+                Choice { text: root.t("noDefault"); active: root.draftDefault === ""; onClicked: { root.draftDefault = ""; root.saved = false } }
               }
               Label { width: parent.width; text: root.t("defaultHint"); wrapMode: Text.Wrap; color: root.dim; font.pixelSize: root.secondarySize }
               Label {
@@ -876,7 +896,7 @@ Panel {
             Label { visible: text !== ""; width: parent.width; text: root.formError; color: root.urgent; wrapMode: Text.Wrap }
             Row {
               spacing: Style.space(10)
-              Action { objectName: "saveHabit"; text: root.t(root.saving ? "saving" : "saveHabit"); selected: true; enabled: !root.busy; onClicked: root.save() }
+               Action { objectName: "saveHabit"; text: root.t(root.saving ? "saving" : "saveHabit"); active: true; enabled: !root.busy; onClicked: root.save() }
               Action { text: root.t("cancel"); enabled: !root.busy; onClicked: root.cancel() }
               Label {
                 visible: root.saved
@@ -928,6 +948,10 @@ Panel {
     opacity: enabled ? 1 : 0.4
     onActiveFocusChanged: if (activeFocus && activeFocusOnTab) root.revealFocus(this)
   }
+  // Use the theme's active fill without replacing readable text with the selection tint.
+  component Choice: Action {
+    Accessible.selected: active
+  }
   component Card: BorderSurface {
     color: root.tint(root.foreground, 0.025)
     borderSpec: Border.flat(root.tint(root.foreground, 0.12), 1)
@@ -951,6 +975,7 @@ Panel {
           ? root.t("todayDate").arg(root.displayDate(root.selectedDay))
           : root.displayDate(root.selectedDay)
         color: root.dim
+        font.pixelSize: root.secondarySize
       }
       Action {
         id: backToday
@@ -966,8 +991,8 @@ Panel {
       width: parent.width
       text: root.habit ? root.habit.question : ""
       wrapMode: Text.Wrap
-      font.pixelSize: Math.max(24, Style.font.displayLarge + 1)
-      font.bold: true
+      font.pixelSize: root.displaySize
+      font.weight: Font.DemiBold
       lineHeight: 1.12
     }
     Label {
@@ -984,19 +1009,19 @@ Panel {
       Repeater {
         id: answerButtons
         model: ["yes", "no"]
-        Action {
+        Choice {
           required property string modelData
           objectName: "answer-" + modelData
           width: (answers.width - answers.spacing) / 2
-          height: Math.max(46, Style.space(51))
-          fontSize: Math.max(18, Style.font.subtitle)
-          iconText: selected ? "✓" : ""
+          height: Math.max(46, implicitHeight + Style.space(8), Style.space(51))
+          fontSize: root.answerSize
+          iconText: active ? "✓" : ""
           text: root.t(modelData)
-          selected: root.record.value === modelData
-          foreground: !selected ? root.foreground
-            : root.habit && Model.successFor(root.habit.kind, modelData) ? root.accent : root.urgent
+          active: root.record.value === modelData
+          foreground: !active ? root.foreground
+            : root.readable(root.habit && Model.successFor(root.habit.kind, modelData) ? root.accent : root.urgent,
+              root.blend(root.foreground, root.surface, 0.15))
           Accessible.description: root.t(root.habit && Model.successFor(root.habit.kind, modelData) ? "onTrack" : "setback")
-          Accessible.selected: selected
           enabled: !root.busy && root.habit && root.selectedDay >= root.habit.startDate && root.selectedDay <= root.todayKey
           onClicked: root.hostWidget.setAnswer(root.habit.id, root.selectedDay, modelData)
         }
@@ -1028,7 +1053,7 @@ Panel {
     property string value: ""
     property color tone: root.foreground
     spacing: Style.space(8)
-    Label { text: parent.value; color: parent.tone; font.pixelSize: Math.max(23, Style.font.display); font.bold: true }
+    Label { text: parent.value; color: root.readable(parent.tone, root.surface); font.pixelSize: root.displaySize; font.weight: Font.DemiBold }
     Label { width: parent.width; text: parent.caption; color: root.dim; font.pixelSize: root.secondarySize; wrapMode: Text.Wrap }
   }
   component Rate: Column {
@@ -1038,7 +1063,7 @@ Panel {
     property int total: 0
     spacing: Style.space(7)
     Label { width: parent.width; text: rate.caption; color: root.dim; wrapMode: Text.Wrap }
-    Label { text: root.pct(rate.total ? rate.correct / rate.total : 0, rate.total); font.pixelSize: Math.max(22, Style.font.display); font.bold: true }
+    Label { text: root.pct(rate.total ? rate.correct / rate.total : 0, rate.total); font.pixelSize: root.displaySize; font.weight: Font.DemiBold }
     Label { width: parent.width; text: root.t("rateCount").arg(root.n(rate.correct)).arg(root.n(rate.total)); color: root.dim; wrapMode: Text.Wrap; font.pixelSize: root.secondarySize }
   }
   component Legend: Row {
@@ -1052,6 +1077,6 @@ Panel {
   component FieldGroup: Column {
     property string label: ""
     spacing: Style.space(9)
-    Label { text: parent.label; font.bold: true }
+    Label { text: parent.label; font.weight: Font.DemiBold }
   }
 }

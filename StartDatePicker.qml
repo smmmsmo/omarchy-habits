@@ -14,6 +14,8 @@ BorderSurface {
   property color accent: Color.accent
   property color muted: foreground
   property string fontFamily: Style.font.family
+  property int bodySize: Style.font.body
+  property int secondarySize: Style.font.bodySmall
   readonly property string minimumDate: "1900-01-01"
   property date viewedMonth: Model.dateFromKey(maximumDate)
   property string cursorDate: maximumDate
@@ -56,7 +58,7 @@ BorderSurface {
         anchors.rightMargin: Style.space(8)
         anchors.verticalCenter: parent.verticalCenter
         text: picker.locale.toString(picker.viewedMonth, "MMMM yyyy")
-        font.bold: true
+         font.weight: Font.DemiBold
         elide: Text.ElideRight
       }
       Row {
@@ -89,7 +91,7 @@ BorderSurface {
           text: picker.locale.dayName(modelData, Locale.ShortFormat)
           horizontalAlignment: Text.AlignHCenter
           color: picker.muted
-          font.pixelSize: Math.max(13, Style.font.bodySmall)
+          font.pixelSize: picker.secondarySize
           elide: Text.ElideRight
         }
       }
@@ -128,17 +130,17 @@ BorderSurface {
           required property var modelData
           objectName: "startDate-" + modelData.key
           width: dates.cellWidth
-          height: Math.max(34, Style.space(36))
+          height: Math.max(34, picker.bodySize + Style.space(14))
           horizontalPadding: 0
           focusable: false // One keyboard stop for the grid instead of 42.
           opacity: !modelData.inMonth ? 0 : enabled ? 1 : 0.35
           enabled: modelData.inMonth && picker.inRange(modelData.key)
           text: I18n.formatNumber(modelData.day)
-          selected: modelData.key === picker.cursorDate
-          hasCursor: selected && dates.activeFocus
+          active: modelData.key === picker.cursorDate
+          hasCursor: active && dates.activeFocus
           Accessible.role: Accessible.Cell
           Accessible.name: picker.locale.toString(Model.dateFromKey(modelData.key), "dd MMM yyyy")
-          Accessible.selected: selected
+          Accessible.selected: active
           Accessible.ignored: !modelData.inMonth
           onClicked: if (enabled) picker.commit(modelData.key)
         }
@@ -158,14 +160,14 @@ BorderSurface {
     textFormat: Text.PlainText
     color: picker.foreground
     font.family: picker.fontFamily
-    font.pixelSize: Math.max(15, Style.font.body)
+    font.pixelSize: picker.bodySize
   }
   component DateButton: Button {
     foreground: picker.foreground
     accent: picker.accent
     fontFamily: picker.fontFamily
     focusable: true
-    fontSize: Math.max(14, Style.font.bodySmall)
+    fontSize: picker.bodySize
     horizontalPadding: Style.space(9)
     verticalPadding: Style.space(5)
     opacity: enabled ? 1 : 0.4
