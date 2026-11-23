@@ -1,4 +1,8 @@
-# 1.3.3 — Smaller type
+# 1.3.4 — Less repetition
+
+Habit names appear in one place: the sidebar, the narrow-layout picker, or the title for a single habit. Task shows a full date only when editing an earlier answer. Analysis relies on the highlighted calendar day instead of printing its full date again. Type is slightly smaller; the Yes/No hit areas are unchanged.
+
+## 1.3.3 — Smaller type
 
 Base text sizes are now 12 px for secondary labels, 13 px for body and navigation, 14 px for Yes/No, 17 px for headings, and 20 px for the question and key numbers. The typeface, popup width, and Yes/No hit areas are unchanged.
 

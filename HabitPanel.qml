@@ -53,10 +53,10 @@ Panel {
   readonly property string fontFamily: Qt.fontFamilies().indexOf("Adwaita Sans") >= 0 ? "Adwaita Sans" : "sans-serif"
   readonly property real typeScale: Math.max(1, Style.fontScale)
   readonly property int secondarySize: typeSize(12)
-  readonly property int bodySize: typeSize(13)
-  readonly property int answerSize: typeSize(14)
-  readonly property int headingSize: typeSize(17)
-  readonly property int displaySize: typeSize(20)
+  readonly property int bodySize: typeSize(12)
+  readonly property int answerSize: typeSize(13)
+  readonly property int headingSize: typeSize(16)
+  readonly property int displaySize: typeSize(18)
   readonly property var locale: Qt.locale(Commons.I18n.formatLocale)
 
   Commons.Translations {
@@ -277,9 +277,11 @@ Panel {
     content: Item {
       id: content
       property alias scrollArea: detailScroll
-      readonly property bool wide: width >= Math.max(500, Style.space(580))
+      readonly property bool multipleHabits: root.trackerState.habits.length > 1
+      readonly property bool showSidebar: multipleHabits && !root.creating && width >= Math.max(500, Style.space(580))
       anchors.fill: parent
-      implicitHeight: Math.max(305, bodyTop.y + detailColumn.implicitHeight)
+      implicitHeight: Math.max(245, bodyTop.y + Math.max(detailColumn.implicitHeight,
+        showSidebar ? Math.min(habitList.implicitHeight, Style.space(220)) : 0))
       focus: true
       Keys.onEscapePressed: {
         if (root.datePickerOpen) root.datePickerOpen = false
@@ -292,11 +294,16 @@ Panel {
         width: parent.width
         height: Math.max(headerActions.implicitHeight, Style.space(40))
         Label {
+          objectName: "popupTitle"
           anchors.left: parent.left
+          anchors.right: headerActions.left
+          anchors.rightMargin: Style.space(12)
           anchors.verticalCenter: parent.verticalCenter
-          text: root.t("title")
+          text: root.creating ? root.t("newHabit")
+            : root.habit && !content.multipleHabits ? root.habit.name : root.t("title")
           font.pixelSize: root.headingSize
           font.weight: Font.DemiBold
+          elide: Text.ElideRight
         }
         Row {
           id: headerActions
@@ -305,6 +312,7 @@ Panel {
           Action {
             text: root.t("newHabit")
             iconText: "+"
+            visible: !root.creating
             onClicked: root.beginEdit(null)
           }
           Action { text: "×"; objectName: "closeHabits"; Accessible.name: root.t("close"); onClicked: root.close() }
@@ -322,22 +330,14 @@ Panel {
       // stack of statistic cards competing with the selected habit.
       Item {
         id: sidebar
-        visible: content.wide
+        visible: content.showSidebar
         anchors.top: bodyTop.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
         width: Math.max(114, Style.space(132))
-        Label {
-          id: sidebarTitle
-          text: root.t("yourHabits")
-          color: root.dim
-          font.pixelSize: root.secondarySize
-          font.weight: Font.DemiBold
-        }
         Flickable {
           objectName: "habitsScroll"
-          anchors.top: sidebarTitle.bottom
-          anchors.topMargin: Style.space(10)
+          anchors.top: parent.top
           anchors.bottom: parent.bottom
           width: parent.width
           contentWidth: width
@@ -357,7 +357,7 @@ Panel {
                 height: Math.max(40, root.bodySize + Style.space(20))
                 text: ""
                 Accessible.name: root.t("habitStatus").arg(modelData.name).arg(root.t(root.todayStatus(modelData)))
-                 selected: root.habit && root.habit.id === modelData.id && !root.creating
+                 selected: root.habit && root.habit.id === modelData.id
                 bordered: false
                 onClicked: root.chooseHabit(modelData.id)
                 Column {
@@ -388,7 +388,7 @@ Panel {
         }
       }
       Rectangle {
-        visible: content.wide
+        visible: content.showSidebar
         anchors.left: sidebar.right
         anchors.leftMargin: Style.space(12)
         anchors.top: sidebar.top
@@ -401,8 +401,8 @@ Panel {
         id: detailScroll
         objectName: "habitsScroll"
         anchors.top: bodyTop.top
-        anchors.left: content.wide ? sidebar.right : parent.left
-        anchors.leftMargin: content.wide ? Style.space(28) : 0
+        anchors.left: content.showSidebar ? sidebar.right : parent.left
+        anchors.leftMargin: content.showSidebar ? Style.space(28) : 0
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         contentWidth: width
@@ -427,11 +427,9 @@ Panel {
           Column {
             visible: !root.habit && !root.editing && root.hostWidget && root.hostWidget.loaded
             width: parent.width
-            spacing: Style.space(20)
-            Item { width: 1; height: Style.space(70) }
-            Label { width: parent.width; text: root.t("emptyTitle"); font.pixelSize: root.displaySize; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
+            spacing: Style.space(10)
+            Label { width: parent.width; text: root.t("emptyTitle"); font.pixelSize: root.headingSize; font.weight: Font.DemiBold; wrapMode: Text.Wrap }
             Label { width: parent.width; text: root.t("emptyHint"); color: root.dim; wrapMode: Text.Wrap }
-            Action { text: root.t("createFirst"); onClicked: root.beginEdit(null) }
           }
           Label {
             visible: !root.habit && !root.editing && root.hostWidget && !root.hostWidget.loaded && text !== ""
@@ -447,7 +445,7 @@ Panel {
             QQC.ComboBox {
               id: habitPicker
               objectName: "habitPicker"
-              visible: !content.wide
+              visible: content.multipleHabits && !content.showSidebar
               width: parent.width
               model: root.trackerState.habits
               textRole: "name"
@@ -480,24 +478,6 @@ Panel {
                   verticalAlignment: Text.AlignVCenter
                 }
                 background: Rectangle { color: parent.highlighted ? root.tint(root.accent, 0.18) : Commons.Color.background }
-              }
-            }
-            Item {
-              visible: content.wide
-              width: parent.width
-              height: habitHeading.implicitHeight
-              Column {
-                id: habitHeading
-                anchors.left: parent.left
-                anchors.right: parent.right
-                spacing: Style.space(9)
-                Label {
-                  width: parent.width
-                  text: root.habit ? root.habit.name : ""
-                  wrapMode: Text.Wrap
-                  font.pixelSize: root.headingSize
-                  font.weight: Font.DemiBold
-                }
               }
             }
             Flow {
@@ -555,7 +535,12 @@ Panel {
                   id: monthControls
                   anchors.right: parent.right
                   spacing: Style.space(6)
-                  Action { text: root.t("today"); onClicked: root.inspectDay(root.todayKey) }
+                  Action {
+                    objectName: "calendarToday"
+                    text: root.t("today")
+                    visible: root.selectedDay !== root.todayKey
+                    onClicked: { root.inspectDay(root.todayKey); calendar.forceActiveFocus() }
+                  }
                   Action { text: Commons.I18n.rightToLeft ? "›" : "‹"; Accessible.name: root.t("previousMonth"); enabled: root.canMoveMonth(-1); onClicked: root.moveMonth(-1) }
                   Action { text: Commons.I18n.rightToLeft ? "‹" : "›"; Accessible.name: root.t("nextMonth"); enabled: root.canMoveMonth(1); onClicked: root.moveMonth(1) }
                 }
@@ -596,7 +581,7 @@ Panel {
                     root.inspectDay(root.todayKey)
                     event.accepted = true
                   } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                     if (root.record.source !== "before" && root.record.source !== "future") analysisCalendar.editDay()
+                    if (root.record.source !== "before" && root.record.source !== "future") analysisCalendar.editDay()
                     event.accepted = true
                   }
                 }
@@ -674,11 +659,13 @@ Panel {
                 width: parent.width
                 spacing: Style.space(12)
                 Label {
-                  text: root.t("selectedDay").arg(root.displayDate(root.selectedDay)).arg(root.dayStatus())
+                  objectName: "analysisDayStatus"
+                  text: root.dayStatus()
                   width: Math.min(parent.width, implicitWidth)
                   height: Math.max(implicitHeight, editAnswer.implicitHeight)
                   verticalAlignment: Text.AlignVCenter
                   wrapMode: Text.Wrap
+                  Accessible.name: root.t("calendarDay").arg(root.displayDate(root.selectedDay)).arg(text)
                 }
                 Action {
                   id: editAnswer
@@ -706,8 +693,8 @@ Panel {
               width: parent.width
               spacing: Math.max(16, Style.space(19))
               PanelSeparator { foreground: root.foreground }
-              Label { id: progressHeading; text: root.t("progress"); font.weight: Font.DemiBold; font.pixelSize: root.headingSize }
               Row {
+                id: progressHeading
                 width: parent.width
                 spacing: Style.space(14)
                 Stat { width: (parent.width - parent.spacing * 2) / 3; caption: root.t("currentStreak"); value: root.t("streakValue").arg(root.n(root.stats ? root.stats.currentStreak : 0)) }
@@ -764,8 +751,6 @@ Panel {
                   wrapMode: Text.Wrap
                 }
               }
-              PanelSeparator { foreground: root.foreground }
-              Label { width: parent.width; text: root.t("analysisHelp"); color: root.dim; wrapMode: Text.Wrap; font.pixelSize: root.secondarySize }
             }
           }
 
@@ -775,7 +760,6 @@ Panel {
             visible: root.editing
             width: parent.width
             spacing: Math.max(17, Style.space(20))
-            Label { visible: root.creating; text: root.t("newHabit"); font.pixelSize: root.headingSize; font.weight: Font.DemiBold }
             FieldGroup {
               width: parent.width
               label: root.t("habitName")
@@ -966,21 +950,20 @@ Panel {
     }
     PanelSeparator { foreground: root.foreground }
     Flow {
+      objectName: "pastDateContext"
+      visible: root.selectedDay !== root.todayKey
       width: parent.width
       spacing: Style.space(12)
       Label {
         height: Math.max(implicitHeight, backToday.visible ? backToday.implicitHeight : 0)
         verticalAlignment: Text.AlignVCenter
-        text: root.selectedDay === root.todayKey
-          ? root.t("todayDate").arg(root.displayDate(root.selectedDay))
-          : root.displayDate(root.selectedDay)
+        text: root.displayDate(root.selectedDay)
         color: root.dim
         font.pixelSize: root.secondarySize
       }
       Action {
         id: backToday
         objectName: "backToToday"
-        visible: root.selectedDay !== root.todayKey
         text: root.t("backToday")
         bordered: false
         onClicked: root.inspectDay(root.todayKey)
@@ -1028,10 +1011,11 @@ Panel {
       }
     }
     Flow {
+      visible: root.record.value !== ""
       width: parent.width
       spacing: Style.space(12)
       Label {
-        text: root.record.value ? root.dayStatus() : root.t("awaitingAnswer")
+        text: root.dayStatus()
         width: Math.min(parent.width, implicitWidth)
         height: Math.max(implicitHeight, clearAnswer.implicitHeight)
         verticalAlignment: Text.AlignVCenter
