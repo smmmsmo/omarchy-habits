@@ -52,11 +52,11 @@ Panel {
   // Keep the bar's monospace glyphs separate from the popup's prose and controls.
   readonly property string fontFamily: Qt.fontFamilies().indexOf("Adwaita Sans") >= 0 ? "Adwaita Sans" : "sans-serif"
   readonly property real typeScale: Math.max(1, Style.fontScale)
-  readonly property int secondarySize: typeSize(13)
-  readonly property int bodySize: typeSize(15)
-  readonly property int answerSize: typeSize(16)
-  readonly property int headingSize: typeSize(20)
-  readonly property int displaySize: typeSize(24)
+  readonly property int secondarySize: typeSize(12)
+  readonly property int bodySize: typeSize(13)
+  readonly property int answerSize: typeSize(14)
+  readonly property int headingSize: typeSize(17)
+  readonly property int displaySize: typeSize(20)
   readonly property var locale: Qt.locale(Commons.I18n.formatLocale)
 
   Commons.Translations {

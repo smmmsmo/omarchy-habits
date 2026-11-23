@@ -1,4 +1,8 @@
-# 1.3.2 — Compact typography
+# 1.3.3 — Smaller type
+
+Base text sizes are now 12 px for secondary labels, 13 px for body and navigation, 14 px for Yes/No, 17 px for headings, and 20 px for the question and key numbers. The typeface, popup width, and Yes/No hit areas are unchanged.
+
+## 1.3.2 — Compact typography
 
 The popup uses Adwaita Sans when installed, with a system sans-serif fallback. A shared scale covers 13 px supporting text, 15 px body and navigation, 16 px Yes/No, 20 px headings, and 24 px questions and key numbers. These are logical pixels and grow with larger Omarchy fonts. The compact popup width is unchanged.
 
