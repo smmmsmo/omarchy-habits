@@ -254,17 +254,17 @@ Panel {
     owner: root.hostWidget || root
     bar: root.bar
     open: root.opened
-    padding: Math.min(30, Math.max(18, Math.round(contentWidth * 0.041)))
+    padding: Math.min(24, Math.max(16, Math.round(contentWidth * 0.034)))
     focusTarget: panel.loadedContent
-    contentWidth: panel.fittedContentWidth(Math.max(820, Style.space(960)))
-    contentHeight: panel.fittedContentHeight(panel.loadedContentHeight || 390)
+    contentWidth: panel.fittedContentWidth(Math.max(560, Style.space(650)))
+    contentHeight: panel.fittedContentHeight(panel.loadedContentHeight || 340)
 
     content: Item {
       id: content
       property alias scrollArea: detailScroll
-      readonly property bool wide: width >= Math.max(630, Style.space(690))
+      readonly property bool wide: width >= Math.max(500, Style.space(580))
       anchors.fill: parent
-      implicitHeight: Math.max(360, bodyTop.y + detailColumn.implicitHeight)
+      implicitHeight: Math.max(305, bodyTop.y + detailColumn.implicitHeight)
       focus: true
       Keys.onEscapePressed: {
         if (root.datePickerOpen) root.datePickerOpen = false
@@ -275,7 +275,7 @@ Panel {
       Item {
         id: header
         width: parent.width
-        height: Math.max(40, Style.space(44))
+        height: Math.max(36, Style.space(40))
         Label {
           anchors.left: parent.left
           anchors.verticalCenter: parent.verticalCenter
@@ -297,10 +297,10 @@ Panel {
       PanelSeparator {
         id: headerRule
         width: parent.width
-        y: header.height + Style.space(14)
+        y: header.height + Style.space(10)
         foreground: root.foreground
       }
-      Item { id: bodyTop; y: headerRule.y + headerRule.height + Math.max(20, Style.space(24)) }
+      Item { id: bodyTop; y: headerRule.y + headerRule.height + Math.max(14, Style.space(18)) }
 
       // The habit list is separate from the detail canvas, never another
       // stack of statistic cards competing with the selected habit.
@@ -310,7 +310,7 @@ Panel {
         anchors.top: bodyTop.top
         anchors.bottom: parent.bottom
         anchors.left: parent.left
-        width: Math.max(154, Style.space(180))
+        width: Math.max(114, Style.space(132))
         Label {
           id: sidebarTitle
           text: root.t("yourHabits")
@@ -321,7 +321,7 @@ Panel {
         Flickable {
           objectName: "habitsScroll"
           anchors.top: sidebarTitle.bottom
-          anchors.topMargin: Math.max(12, Style.space(16))
+          anchors.topMargin: Style.space(10)
           anchors.bottom: parent.bottom
           width: parent.width
           contentWidth: width
@@ -331,14 +331,14 @@ Panel {
           Column {
             id: habitList
             width: parent.width
-            spacing: Style.space(8)
+            spacing: Style.space(5)
             Repeater {
               model: root.trackerState.habits
               Action {
                 id: habitButton
                 required property var modelData
                 width: habitList.width
-                height: Math.max(48, Style.space(52))
+                height: Math.max(40, Style.space(45))
                 text: ""
                 Accessible.name: root.t("habitStatus").arg(modelData.name).arg(root.t(root.todayStatus(modelData)))
                  selected: root.habit && root.habit.id === modelData.id && !root.creating
@@ -374,7 +374,7 @@ Panel {
       Rectangle {
         visible: content.wide
         anchors.left: sidebar.right
-        anchors.leftMargin: Style.space(18)
+        anchors.leftMargin: Style.space(12)
         anchors.top: sidebar.top
         anchors.bottom: parent.bottom
         width: 1
@@ -386,7 +386,7 @@ Panel {
         objectName: "habitsScroll"
         anchors.top: bodyTop.top
         anchors.left: content.wide ? sidebar.right : parent.left
-        anchors.leftMargin: content.wide ? Style.space(42) : 0
+        anchors.leftMargin: content.wide ? Style.space(28) : 0
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         contentWidth: width
@@ -399,7 +399,7 @@ Panel {
         Column {
           id: detailColumn
           width: detailScroll.width
-          spacing: Math.max(20, Style.space(24))
+          spacing: Math.max(16, Style.space(19))
           Label {
             visible: text !== ""
             width: parent.width
@@ -427,7 +427,7 @@ Panel {
           Column {
             visible: root.habit !== null && !root.creating
             width: parent.width
-            spacing: Math.max(18, Style.space(22))
+            spacing: Math.max(13, Style.space(16))
             QQC.ComboBox {
               id: habitPicker
               objectName: "habitPicker"
@@ -479,7 +479,7 @@ Panel {
                   width: parent.width
                   text: root.habit ? root.habit.name : ""
                   wrapMode: Text.Wrap
-                  font.pixelSize: Math.max(27, Style.font.display)
+                  font.pixelSize: Math.max(24, Style.font.display)
                   font.bold: true
                 }
               }
@@ -493,8 +493,8 @@ Panel {
                   required property string modelData
                   objectName: modelData + "Tab"
                   text: ""
-                  width: tabLabel.implicitWidth + 2 * Math.max(14, Style.space(16))
-                  height: Math.max(38, Style.space(42))
+                  width: tabLabel.implicitWidth + 2 * Math.max(12, Style.space(14))
+                  height: Math.max(35, Style.space(40))
                   Accessible.role: Accessible.PageTab
                   Accessible.name: root.t(modelData)
                   Accessible.selected: selected
@@ -517,7 +517,7 @@ Panel {
               visible: root.tab === "analysis"
               objectName: "habitAnalysis"
               width: parent.width
-              spacing: Math.max(12, Style.space(15))
+              spacing: Math.max(10, Style.space(12))
               function editDay() {
                 root.setTab("task", true)
                 Qt.callLater(function() { if (root.tab === "task") checkIn.focusAnswer() })
@@ -593,7 +593,7 @@ Panel {
                     readonly property bool failure: modelData.state === "failure"
                     readonly property color tone: success ? root.accent : failure ? root.urgent : root.foreground
                     width: (calendar.width - calendar.spacing * 6) / 7
-                    height: Math.max(40, Style.space(47))
+                    height: Math.max(34, Style.space(40))
                     radius: Style.cornerRadius > 0 ? Math.min(Style.cornerRadius, Style.space(5)) : 0
                     opacity: !modelData.inMonth ? 0 : modelData.source === "before" || modelData.source === "future" ? 0.38 : 1
                     color: success || failure ? root.tint(tone, 0.16)
@@ -756,7 +756,7 @@ Panel {
           Column {
             visible: root.editing
             width: parent.width
-            spacing: Math.max(22, Style.space(25))
+            spacing: Math.max(17, Style.space(20))
             Label { visible: root.creating; text: root.t("newHabit"); font.pixelSize: root.headingSize; font.bold: true }
             FieldGroup {
               width: parent.width
@@ -935,7 +935,7 @@ Panel {
   }
   component CheckIn: Column {
     objectName: "dailyCheckin"
-    spacing: Math.max(16, Style.space(19))
+    spacing: Math.max(12, Style.space(15))
     function focusAnswer() {
       var answer = answerButtons.itemAt(root.record.value === "no" ? 1 : 0)
       if (answer && answer.enabled) answer.forceActiveFocus()
@@ -966,7 +966,7 @@ Panel {
       width: parent.width
       text: root.habit ? root.habit.question : ""
       wrapMode: Text.Wrap
-      font.pixelSize: Math.max(28, Style.font.displayLarge + 4)
+      font.pixelSize: Math.max(24, Style.font.displayLarge + 1)
       font.bold: true
       lineHeight: 1.12
     }
@@ -979,7 +979,7 @@ Panel {
     }
     Row {
       id: answers
-      width: Math.min(parent.width, Math.max(360, Style.space(425)))
+      width: Math.min(parent.width, Math.max(290, Style.space(340)))
       spacing: Math.max(12, Style.space(14))
       Repeater {
         id: answerButtons
@@ -988,7 +988,7 @@ Panel {
           required property string modelData
           objectName: "answer-" + modelData
           width: (answers.width - answers.spacing) / 2
-          height: Math.max(54, Style.space(59))
+          height: Math.max(46, Style.space(51))
           fontSize: Math.max(18, Style.font.subtitle)
           iconText: selected ? "✓" : ""
           text: root.t(modelData)

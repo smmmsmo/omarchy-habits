@@ -1,4 +1,8 @@
-# 1.3.0 — A focused daily check-in
+# 1.3.1 — Smaller popup
+
+The popup is about one-third narrower at the previous default size. Padding and row heights are smaller, while body text and the three-tab layout are unchanged.
+
+## 1.3.0 — A focused daily check-in
 
 **Task** shows the question and large Yes/No controls. The calendar is in **Analysis**. Choose a date there to edit its answer in Task, or expand **Show progress & recovery** for the report. The popup uses larger proportional type and adapts its height to the active view.
 
