@@ -89,7 +89,7 @@ BorderSurface {
           text: picker.locale.dayName(modelData, Locale.ShortFormat)
           horizontalAlignment: Text.AlignHCenter
           color: picker.muted
-          font.pixelSize: Math.max(10, Style.font.caption)
+          font.pixelSize: Math.max(13, Style.font.bodySmall)
           elide: Text.ElideRight
         }
       }
@@ -128,7 +128,7 @@ BorderSurface {
           required property var modelData
           objectName: "startDate-" + modelData.key
           width: dates.cellWidth
-          height: Style.space(32)
+          height: Math.max(34, Style.space(36))
           horizontalPadding: 0
           focusable: false // One keyboard stop for the grid instead of 42.
           opacity: !modelData.inMonth ? 0 : enabled ? 1 : 0.35
@@ -158,14 +158,14 @@ BorderSurface {
     textFormat: Text.PlainText
     color: picker.foreground
     font.family: picker.fontFamily
-    font.pixelSize: Math.max(12, Style.font.body)
+    font.pixelSize: Math.max(15, Style.font.body)
   }
   component DateButton: Button {
     foreground: picker.foreground
     accent: picker.accent
     fontFamily: picker.fontFamily
     focusable: true
-    fontSize: Math.max(11, Style.font.bodySmall)
+    fontSize: Math.max(14, Style.font.bodySmall)
     horizontalPadding: Style.space(9)
     verticalPadding: Style.space(5)
     opacity: enabled ? 1 : 0.4

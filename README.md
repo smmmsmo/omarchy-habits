@@ -2,7 +2,7 @@
 
 A private, offline bar plugin for building habits and quitting unwanted behaviors. Each habit has its own calendar, check-in, and progress report.
 
-![Task, Analysis, and Settings tabs with a check-in and calendar](docs/calendar.png)
+![Task tab with a focused Yes/No check-in](docs/task.png)
 
 ## Install
 
@@ -29,9 +29,9 @@ Run the same commands to update a manual installation. If the running shell has 
 - Use **New habit** to choose the type, starting date, question, optional message, and what to do with untouched days. Edit those same fields later under **Settings**.
 - For the starting date, type `DD MMM YYYY` or select **Choose date**. The picker only allows today and earlier dates.
 - Ask whether the behavior happened. For **Build**, Yes is on track; for **Quit**, No is on track.
-- Click a day to view or change its answer. The month arrows browse history; **Today** returns you to the current date.
-- **Tab** moves between controls. On the calendar, arrow keys move by day or week, **Home** returns to today, and **Enter** focuses the answer. **Esc** leaves editing or closes the popup.
-- **Analysis** shows the selected habit’s 7-day, 30-day, and since-start rates, how many answers were manual or automatic, and recovery details.
+- Open **Analysis** for the calendar. Select a day and choose **Edit answer** or **Check in** to answer for that date in **Task**.
+- **Show progress & recovery** opens the selected habit’s streaks, 7-day, 30-day, and since-start rates, manual and automatic counts, and recovery details.
+- **Tab** moves between controls. On the calendar, arrow keys move by day or week, **Home** returns to today, and **Enter** opens that day’s answer. **Esc** leaves editing or closes the popup.
 
 ## How the numbers work
 
