@@ -18,7 +18,6 @@ Panel {
   property int viewMonth: new Date().getMonth()
   property bool creating: false
   property string tab: "task"
-  property bool datePickerOpen: false
   property bool saved: false
   property bool detailsOpen: false
   property bool saving: false
@@ -28,7 +27,7 @@ Panel {
   property string draftKind: "good"
   property string draftQuestion: ""
   property string draftMessage: ""
-  property string draftStart: ""
+  property string draftStart: Model.todayKey()
   property string draftDefault: ""
   property string formError: ""
 
@@ -38,15 +37,16 @@ Panel {
     || Model.findHabit(trackerState, trackerState.selectedHabitId) || trackerState.habits[0] || null
   readonly property bool editing: creating || (tab === "settings" && habit !== null)
   readonly property var stats: opened && habit && tab === "analysis" ? Model.analyzeHabit(habit, trackerState, todayKey) : null
-  readonly property string draftDateKey: editing ? parseDate(draftStart) : ""
-  readonly property int previewDays: draftDateKey >= "1900-01-01"
-    ? Model.defaultPreview(trackerState, editId, draftDateKey, todayKey, draftDefault) : 0
+  readonly property int previewDays: editing && draftStart >= "1900-01-01"
+    ? Model.defaultPreview(trackerState, editId, draftStart, todayKey, draftDefault) : 0
   readonly property var record: Model.recordFor(trackerState, habit, selectedDay, todayKey)
   readonly property var cells: Model.monthGrid(habit, trackerState, viewYear, viewMonth, todayKey)
   readonly property color foreground: Commons.Color.popups.text
   readonly property color accent: Commons.Color.accent
   readonly property color urgent: Commons.Color.urgent
   readonly property color surface: Commons.Color.popups.background
+  readonly property color calendarSuccess: luminance(surface) < 0.32 ? "#75d796" : "#17683d"
+  readonly property color calendarSetback: luminance(surface) < 0.32 ? "#f88c9a" : "#a32b40"
   readonly property color dim: readable(blend(foreground, surface, 0.8), surface)
   readonly property bool busy: !hostWidget || hostWidget.busy || !hostWidget.loaded
   // Keep the bar's monospace glyphs separate from the popup's prose and controls.
@@ -68,18 +68,6 @@ Panel {
   function displayDate(key) {
     var date = Model.dateFromKey(key)
     return date ? locale.toString(date, "dd MMM yyyy") : ""
-  }
-  function parseDate(text) {
-    if (!text.trim()) return ""
-    var key = Model.parseDisplayDate(text)
-    if (key) return key
-    try {
-      var date = Date.fromLocaleDateString(locale, text.trim(), "dd MMM yyyy")
-      var parsed = Model.keyForDate(date)
-      return parsed && displayDate(parsed).toLowerCase() === text.trim().toLowerCase() ? parsed : ""
-    } catch (error) {
-      return ""
-    }
   }
   function pct(rate, count) { return count ? n(Math.round(rate * 100)) + "%" : "—" }
   function typeSize(size) { return Math.round(size * typeScale) }
@@ -103,7 +91,6 @@ Panel {
     var wasCreating = creating
     creating = false
     selectedId = id
-    datePickerOpen = false
     saved = false
     detailsOpen = false
     deleteArmed = false
@@ -117,7 +104,6 @@ Panel {
     if (saving || (!creating && tab === next)) return
     creating = false
     tab = next
-    datePickerOpen = false
     saved = false
     deleteArmed = false
     if (next === "task" && !keepDay) inspectDay(todayKey)
@@ -143,7 +129,6 @@ Panel {
   }
   function openPage(page) {
     deleteArmed = false
-    datePickerOpen = false
     saved = false
     detailsOpen = false
     formError = ""
@@ -163,7 +148,6 @@ Panel {
     if (saving) return
     creating = !item
     tab = item ? "settings" : "task"
-    datePickerOpen = false
     loadDraft(item)
     if (panel.loadedContent) panel.loadedContent.scrollArea.contentY = 0
   }
@@ -173,7 +157,7 @@ Panel {
     draftKind = item ? item.kind : "good"
     draftQuestion = item ? item.question : t("defaultQuestion")
     draftMessage = item ? item.message : ""
-    draftStart = displayDate(item ? item.startDate : todayKey)
+    draftStart = item ? item.startDate : todayKey
     draftDefault = item ? item.defaultAnswer : ""
     saved = false
     deleteArmed = false
@@ -181,19 +165,17 @@ Panel {
   }
   function cancel() { setTab("task") }
   function setDraftDate(key) {
-    draftStart = displayDate(key)
+    draftStart = key
     saved = false
-    datePickerOpen = false
   }
   function save() {
     if (busy) return
-    var start = parseDate(draftStart)
+    var start = draftStart
     if (!draftName.trim()) { formError = t("nameError"); return }
     if (!draftQuestion.trim()) { formError = t("questionError"); return }
-    if (!start || start < "1900-01-01" || start > todayKey) { formError = t("dateError"); return }
+    if (!Model.validKey(start) || start < "1900-01-01" || start > todayKey) { formError = t("dateError"); return }
     saving = true
     saved = false
-    datePickerOpen = false
     formError = ""
     hostWidget.saveHabit({
       id: editId, name: draftName, kind: draftKind, question: draftQuestion,
@@ -284,8 +266,7 @@ Panel {
         showSidebar ? Math.min(habitList.implicitHeight, Style.space(220)) : 0))
       focus: true
       Keys.onEscapePressed: {
-        if (root.datePickerOpen) root.datePickerOpen = false
-        else if (root.editing) root.cancel()
+        if (root.editing) root.cancel()
         else root.close()
       }
 
@@ -592,12 +573,13 @@ Panel {
                     required property var modelData
                     readonly property bool success: modelData.state === "success"
                     readonly property bool failure: modelData.state === "failure"
-                    readonly property color tone: success ? root.accent : failure ? root.urgent : root.foreground
+                    readonly property color tone: success ? root.calendarSuccess : failure ? root.calendarSetback : root.foreground
+                    objectName: "habitDay-" + modelData.date
                     width: (calendar.width - calendar.spacing * 6) / 7
                     height: Math.max(34, root.bodySize + Style.space(16), Style.space(40))
                     radius: Style.cornerRadius > 0 ? Math.min(Style.cornerRadius, Style.space(5)) : 0
                     opacity: !modelData.inMonth ? 0 : modelData.source === "before" || modelData.source === "future" ? 0.38 : 1
-                    color: success || failure ? root.tint(tone, 0.16)
+                    color: success || failure ? root.tint(tone, 0.20)
                       : hover.hovered && modelData.selectable ? root.tint(tone, 0.09) : root.tint(tone, 0.035)
                     border.width: modelData.date === root.selectedDay && modelData.selectable ? 2 : 0
                     border.color: calendar.activeFocus ? root.accent : root.foreground
@@ -611,7 +593,7 @@ Panel {
                       anchors.centerIn: parent
                       text: root.n(cell.modelData.day)
                       color: cell.success || cell.failure
-                        ? root.readable(cell.tone, root.blend(cell.tone, root.surface, 0.16))
+                        ? root.readable(cell.tone, root.blend(cell.tone, root.surface, 0.20))
                         : root.foreground
                       font.weight: cell.modelData.today ? Font.DemiBold : Font.Normal
                     }
@@ -647,42 +629,28 @@ Panel {
                   }
                 }
               }
-              Flow {
-                width: parent.width
-                spacing: Math.max(12, Style.space(18))
-                Legend { label: root.t("onTrack"); tone: root.accent }
-                Legend { label: root.t("setback"); tone: root.urgent }
-                Legend { label: root.t("automatic"); tone: root.dim; dot: true }
-              }
+              Legend { label: root.t("automatic"); tone: root.dim }
               PanelSeparator { foreground: root.foreground }
               Flow {
                 width: parent.width
                 spacing: Style.space(12)
-                Label {
-                  objectName: "analysisDayStatus"
-                  text: root.dayStatus()
-                  width: Math.min(parent.width, implicitWidth)
-                  height: Math.max(implicitHeight, editAnswer.implicitHeight)
-                  verticalAlignment: Text.AlignVCenter
-                  wrapMode: Text.Wrap
-                  Accessible.name: root.t("calendarDay").arg(root.displayDate(root.selectedDay)).arg(text)
-                }
                 Action {
                   id: editAnswer
                   objectName: "editAnswer"
                   text: root.t(root.record.value ? "editAnswer" : "checkIn")
+                  Accessible.description: root.t("calendarDay").arg(root.displayDate(root.selectedDay)).arg(root.dayStatus())
                   enabled: root.record.source !== "before" && root.record.source !== "future"
                   onClicked: analysisCalendar.editDay()
                 }
-              }
-              Action {
-                objectName: "progressDetails"
-                text: root.t(root.detailsOpen ? "hideProgress" : "showProgress")
-                bordered: false
-                active: root.detailsOpen
-                onClicked: {
-                  root.detailsOpen = !root.detailsOpen
-                  if (root.detailsOpen) Qt.callLater(function() { root.revealFocus(progressHeading) })
+                Action {
+                  objectName: "progressDetails"
+                  text: root.t(root.detailsOpen ? "hideProgress" : "showProgress")
+                  bordered: false
+                  active: root.detailsOpen
+                  onClicked: {
+                    root.detailsOpen = !root.detailsOpen
+                    if (root.detailsOpen) Qt.callLater(function() { root.revealFocus(progressHeading) })
+                  }
                 }
               }
             }
@@ -808,52 +776,22 @@ Panel {
             FieldGroup {
               width: parent.width
               label: root.t("startingDate")
-              Flow {
+              StartDatePicker {
+                objectName: "startDatePicker"
                 width: parent.width
-                spacing: Style.space(8)
-                DraftField {
-                  objectName: "habitStartDate"
-                  Accessible.name: root.t("startingDate")
-                  width: Math.min(parent.width, Style.space(190))
-                  text: root.draftStart
-                  onTextEdited: root.draftStart = text
-                  placeholderText: root.displayDate(root.todayKey)
-                }
-                Action {
-                  id: chooseDateButton
-                  objectName: "chooseStartDate"
-                  text: root.t(root.datePickerOpen ? "hideDatePicker" : "chooseDate")
-                  active: root.datePickerOpen
-                  onClicked: root.datePickerOpen = !root.datePickerOpen
-                }
-              }
-              Loader {
-                width: Math.min(parent.width, Style.space(336))
-                active: root.datePickerOpen && root.editing
-                onLoaded: Qt.callLater(function() {
-                  if (item) { root.revealFocus(item); item.focusDays() }
-                })
-                sourceComponent: StartDatePicker {
-                  objectName: "startDatePicker"
-                  initialDate: root.draftDateKey
-                  maximumDate: root.todayKey
-                  locale: root.locale
-                  translations: strings
-                  foreground: root.foreground
-                  accent: root.accent
-                  muted: root.dim
-                  fontFamily: root.fontFamily
-                  bodySize: root.bodySize
-                  secondarySize: root.secondarySize
-                  onPicked: function(dateKey) {
-                    root.setDraftDate(dateKey)
-                    chooseDateButton.forceActiveFocus()
-                  }
-                  onDismissed: {
-                    root.datePickerOpen = false
-                    chooseDateButton.forceActiveFocus()
-                  }
-                }
+                dateKey: root.draftStart
+                maximumDate: root.todayKey
+                locale: root.locale
+                translations: strings
+                foreground: root.foreground
+                accent: root.accent
+                surface: root.surface
+                muted: root.dim
+                fontFamily: root.fontFamily
+                bodySize: root.bodySize
+                secondarySize: root.secondarySize
+                onPicked: function(dateKey) { root.setDraftDate(dateKey) }
+                onFieldFocused: function(field) { root.revealFocus(field) }
               }
             }
             FieldGroup {
@@ -1053,9 +991,8 @@ Panel {
   component Legend: Row {
     property string label: ""
     property color tone: root.accent
-    property bool dot: false
     spacing: Style.space(7)
-    Rectangle { width: Math.max(7, Style.space(8)); height: width; radius: parent.dot ? width / 2 : Style.space(1); color: parent.tone; anchors.verticalCenter: parent.verticalCenter }
+    Rectangle { width: Math.max(6, Style.space(7)); height: width; radius: width / 2; color: parent.tone; anchors.verticalCenter: parent.verticalCenter }
     Label { text: parent.label; color: root.dim; font.pixelSize: root.secondarySize }
   }
   component FieldGroup: Column {

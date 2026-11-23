@@ -1,4 +1,10 @@
-# 1.3.4 — Less repetition
+# 1.3.5 — Date controls and calendar colors
+
+Starting dates use separate Day, Month, and Year menus. Each menu closes after selection; the selected date stays valid as the month or year changes. The Analysis calendar now marks on-track days green and setbacks red, with checkmarks and crosses as well as color.
+
+![Day, month, and year selectors](date-picker.png)
+
+## 1.3.4 — Less repetition
 
 Habit names appear in one place: the sidebar, the narrow-layout picker, or the title for a single habit. Task shows a full date only when editing an earlier answer. Analysis relies on the highlighted calendar day instead of printing its full date again. Type is slightly smaller; the Yes/No hit areas are unchanged.
 
@@ -26,8 +32,6 @@ The popup is about one-third narrower at the previous default size. Padding and 
 
 Each habit has three tabs: **Task** (Yes/No and calendar), **Analysis** (rates, streaks, and recovery), and **Settings** (setup and defaults). New habits and existing settings share a date picker that opens only when needed; the date can still be typed.
 
-![Optional starting-date picker in the new habit form](date-picker.png)
-
 ## 1.1.0 — Calendar and per-habit analysis
 
 The calendar opens to the last viewed habit, with today’s Yes/No check-in above the date grid. On narrow screens the sidebar becomes a selector. A separate Analysis tab reports rates, counts, and recovery for that habit only.
@@ -40,7 +44,7 @@ This version keeps existing manual answers and carries the old shared starting d
 - In a test profile, set up three habits with different start dates and answers. Verify sidebar status, per-habit reports, calendar markers, editing an automatic answer, and picking a different default without rewriting saved history.
 - Restart the shell after changing the selected habit. Verify selection and history are preserved.
 - Check a narrow popup, a light and dark theme, Tab/Enter navigation, month bounds, and the visible backfill preview before saving.
-- In both Settings and New habit, choose a past date from the picker, check that future days are disabled, and confirm typing still works.
+- In both Settings and New habit, choose a past start date, verify the menus close after selection, and check that future dates cannot be selected.
 - Review both screenshots for demo data only. Create a versioned release from a clean repository, without committing or including personal state.
 
 Known scope: one Yes/No answer per habit per local day, no syncing, no reminders, and no medical interpretation. The default is an assumption, not confirmation that the behavior happened.

@@ -23,9 +23,14 @@ function stats(state) { return M.analyzeHabit(state.habits[0], state, today); }
 
 assert.equal(M.validKey("2026-02-30"), false);
 assert.equal(M.validKey("2024-02-29"), true);
-assert.equal(M.parseDisplayDate("05 Nov 2026"), "2026-11-05");
-assert.equal(M.parseDisplayDate("31 Feb 2026"), "");
-assert.equal(M.parseDisplayDate("2026-11-05"), "2026-11-05");
+const maximum = "2026-11-24";
+assert.deepEqual(M.dateParts("2026-11-05"), { day: 5, month: 11, year: 2026 });
+assert.deepEqual(M.dateLimits(2026, 11, M.dateParts(maximum)), { month: 11, day: 24 });
+assert.deepEqual(M.dateLimits(2024, 2, M.dateParts(maximum)), { month: 12, day: 29 });
+assert.equal(M.changeDatePart("2024-01-31", maximum, "month", 2), "2024-02-29");
+assert.equal(M.changeDatePart("2024-02-29", maximum, "year", 2025), "2025-02-28");
+assert.equal(M.changeDatePart("2025-12-31", maximum, "year", 2026), maximum);
+assert.equal(M.changeDatePart(maximum, maximum, "day", 30), maximum);
 assert.equal(M.addDays("2026-12-31", 1), "2027-01-01");
 assert.equal(M.successFor("bad", "no"), true);
 assert.equal(M.successFor("good", "yes"), true);

@@ -22,15 +22,27 @@ function addDays(key, count) {
 function daysBetween(from, to) {
   return Math.round((dateFromKey(to).getTime() - dateFromKey(from).getTime()) / DAY_MS)
 }
-function parseDisplayDate(text) {
-  var value = String(text || "").trim()
-  if (validKey(value)) return value
-  var match = /^(\d{1,2})\s+([a-z]{3})\s+(\d{4})$/i.exec(value)
-  if (!match) return ""
-  var months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"]
-  var index = months.indexOf(match[2].toLowerCase())
-  var key = match[3] + "-" + pad2(index + 1) + "-" + pad2(Number(match[1]))
-  return index >= 0 && validKey(key) ? key : ""
+function dateParts(key) {
+  var date = dateFromKey(key)
+  return date ? { year: date.getFullYear(), month: date.getMonth() + 1, day: date.getDate() } : null
+}
+function dateLimits(year, month, maximum) {
+  var lastDay = new Date(year, month, 0, 12).getDate()
+  var lastMonth = year === maximum.year ? maximum.month : 12
+  return {
+    month: lastMonth,
+    day: year === maximum.year && month === lastMonth ? Math.min(lastDay, maximum.day) : lastDay
+  }
+}
+function changeDatePart(key, maximumKey, part, value) {
+  var maximum = dateParts(maximumKey)
+  var date = dateParts(key) || dateParts(maximumKey)
+  if (!maximum || !date || !Number.isInteger(value) || !["day", "month", "year"].includes(part)) return key
+  date[part] = value
+  date.year = Math.min(maximum.year, Math.max(1900, date.year))
+  date.month = Math.min(dateLimits(date.year, date.month, maximum).month, Math.max(1, date.month))
+  date.day = Math.min(dateLimits(date.year, date.month, maximum).day, Math.max(1, date.day))
+  return date.year + "-" + pad2(date.month) + "-" + pad2(date.day)
 }
 function enumerateDays(start, end) {
   var days = []
@@ -232,7 +244,7 @@ function analyze(state, today) {
 }
 if (typeof module !== "undefined" && module.exports) module.exports = {
   keyForDate: keyForDate, dateFromKey: dateFromKey, validKey: validKey, todayKey: todayKey,
-  addDays: addDays, daysBetween: daysBetween, parseDisplayDate: parseDisplayDate,
+  addDays: addDays, daysBetween: daysBetween, dateParts: dateParts, dateLimits: dateLimits, changeDatePart: changeDatePart,
   emptyState: emptyState, parseState: parseState, findHabit: findHabit,
   answerFor: answerFor, successFor: successFor, recordFor: recordFor,
   summaryForDay: summaryForDay, defaultPreview: defaultPreview, monthGrid: monthGrid, calendarDates: calendarDates, heatmapWeeks: heatmapWeeks,
