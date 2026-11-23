@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "mo.habits",
+  "name": "Habit Tracker",
+  "version": "1.1.0",
+  "author": "mo",
+  "license": "MIT",
+  "description": "Private yes/no check-ins, monthly calendars, and per-habit recovery analysis.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Habit Tracker",
+    "description": "Build or quit habits with custom questions, automatic answers, monthly calendars, and individual progress reports.",
+    "category": "Wellness",
+    "allowMultiple": false,
+    "defaultSection": "centerEnd"
+  }
+}
