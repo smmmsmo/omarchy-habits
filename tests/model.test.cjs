@@ -132,6 +132,93 @@ assert.equal(legacy.habits[0].defaultAnswer, "", "legacy data gains no guessed a
 assert.equal(M.recordFor(legacy, legacy.habits[0], "2026-11-06", today).source, "manual");
 assert.deepEqual(M.parseState(JSON.stringify(state)), state);
 
+const numeric = fixture("count");
+numeric.habits[0].target = 20;
+numeric.habits[0].unit = "pages";
+enter(numeric, "2026-11-22", 22);
+enter(numeric, "2026-11-23", 20);
+enter(numeric, today, 0);
+const numericRoundTrip = M.parseState(JSON.stringify(numeric));
+assert.equal(M.recordFor(numericRoundTrip, numericRoundTrip.habits[0], today, today).value, 0);
+assert.equal(M.outcome(numeric.habits[0], M.recordFor(numeric, numeric.habits[0], today, today), today, today), "progress");
+assert.equal(stats(numeric).currentStreak, 2, "a partial same-day count does not erase the streak");
+assert.equal(stats(numeric).answered, 2);
+assert.equal(M.analyzeHabit(numeric.habits[0], numeric, "2026-11-25").failureCount, 1);
+enter(numeric, today, 21);
+assert.equal(M.summaryForDay(numeric, today).success, 1);
+assert.equal(stats(numeric).currentStreak, 3);
+
+const archived = fixture("good", "yes");
+enter(archived, "2026-11-19", "yes");
+archived.habits[0].pauses = [{ from: "2026-11-20", to: "2026-11-23" }];
+assert.equal(M.recordFor(archived, archived.habits[0], "2026-11-21", today).source, "paused");
+assert.equal(M.defaultPreview(archived, "htest", "2026-11-19", today, "yes"), 1);
+enter(archived, "2026-11-23", "yes");
+assert.equal(stats(archived).currentStreak, 20, "archive gaps neither add to nor break a streak");
+archived.habits[0].pauses.push({ from: today, to: "" });
+assert.equal(M.isArchived(M.parseState(JSON.stringify(archived)).habits[0]), true);
+assert.equal(M.summaryForDay(archived, today).total, 0);
+assert.equal(stats(archived).currentStreak, 20);
+const year = M.yearMonths(archived.habits[0], archived, 2026, today);
+assert.equal(year.length, 12);
+assert.equal(year[10].available, true);
+assert.equal(year[11].available, false);
+assert.equal(year[10].cells.filter(cell => cell.inMonth).length, 30);
+assert.equal(year[10].cells.find(cell => cell.date === "2026-11-21").state, "paused");
+assert.equal(year[10].cells.find(cell => cell.date === "2026-11-23").state, "success");
+assert.equal(year[10].recorded, 20);
+
+const timed = fixture("good", "yes");
+timed.habits[0].endDate = "2026-11-23";
+const finite = timed.habits[0];
+enter(timed, today, "no");
+assert.deepEqual(M.dateMetrics(finite, "2026-11-20"), { total: 23, elapsed: 19, left: 3, dueToday: false, ended: false });
+assert.deepEqual(M.dateMetrics(finite, finite.endDate), { total: 23, elapsed: 22, left: 0, dueToday: true, ended: false });
+assert.deepEqual(M.dateMetrics(finite, today), { total: 23, elapsed: 23, left: 0, dueToday: false, ended: true });
+assert.equal(M.isDue(finite, finite.endDate), true);
+assert.equal(M.summaryForDay(timed, today).total, 0);
+assert.equal(M.recordFor(timed, finite, today, today).source, "after");
+assert.equal(M.analyzeHabit(finite, timed, "2026-12-10").weekSuccess, 7, "recent stats end at the last tracked day");
+assert.equal(stats(timed).trackedDays, 23);
+assert.equal(stats(timed).currentStreak, 23);
+assert.equal(M.defaultPreview(timed, "htest", "2026-11-20", today, "yes", "2026-11-21"), 2);
+assert.deepEqual(M.parseState(JSON.stringify(timed)), timed);
+timed.preferences.weekStart = 6;
+const week = M.weekGrid(finite, timed, finite.endDate, today);
+assert.deepEqual(week.map(c => c.date), ["2026-11-21", "2026-11-22", "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27"]);
+assert.deepEqual(M.summarizeWeek(week), { success: 3, failure: 0, pending: 0 });
+assert.equal(week[2].selectable, true);
+assert.equal(week[3].selectable, false);
+
+const daily = fixture();
+const build = daily.habits[0];
+daily.habits.push(
+  { ...build, id: "hquit", kind: "bad" },
+  { ...build, id: "hpartial", kind: "count", target: 20 },
+  { ...build, id: "hpending" },
+  { ...build, id: "hended", endDate: "2026-11-23" },
+  { ...build, id: "harchived", pauses: [{ from: today, to: "" }] }
+);
+daily.entries[today] = { htest: "yes", hquit: "yes", hpartial: 0, hended: "yes", harchived: "yes" };
+assert.deepEqual(M.summaryForDay(daily, today), {
+  total: 4, answered: 3, success: 1, failure: 1, progress: 1, pending: 1, perfect: false
+}, "each due habit counts exactly once; expired and archived habits do not count");
+daily.entries[today].hquit = "no";
+assert.equal(M.summaryForDay(daily, today).success, 2, "No is on track for Quit");
+assert.equal(M.barStatus(M.summaryForDay(daily, today)), "progress");
+daily.entries[today].hquit = "yes";
+assert.equal(M.barStatus(M.summaryForDay(daily, today)), "failure");
+assert.equal(M.barStatus(M.summaryForDay(M.emptyState(), today)), "pending");
+assert.equal(M.barStatus(M.summaryForDay(enter(fixture(), today, "yes"), today)), "success");
+function rgb(hex) {
+  const [r, g, b] = hex.slice(1).match(/../g).map(part => Number.parseInt(part, 16) / 255);
+  return { r, g, b };
+}
+for (const background of ["#1e1e2e", "#f6f7fa"].map(rgb)) {
+  for (const status of ["success", "progress", "failure", "best"])
+    assert.ok(M.contrast(rgb(M.paletteColor(status, background)), background) >= 4.5);
+}
+
 const markup = '<img src="https://example.invalid/tracker">';
 state.habits[0].name = markup;
 state.habits[0].question = markup;
@@ -144,4 +231,4 @@ assert.doesNotMatch(qml, /PanelToolTip/, "no untrusted shared tooltip sinks");
 assert.deepEqual([...qml.matchAll(/^\s*tooltipText:\s*(.+)$/gm)].map(match => match[1]),
   ['root.t("appSettings")'], "the sole tooltip uses a fixed translation");
 assert.match(qml, /"dd MMM yyyy"/);
-console.log("Model tests passed: defaults, midnight boundary, manual priority, per-habit dates, calendar, streaks, recovery, migration, plain text.");
+console.log("Model tests passed: calendars, defaults, numeric targets, archive gaps, streaks, recovery, migration, plain text.");

@@ -1,4 +1,5 @@
 import concurrent.futures
+import csv
 import datetime as dt
 import importlib.util
 import json
@@ -76,7 +77,7 @@ class StorageTests(unittest.TestCase):
             entries={YESTERDAY: {"hlegacy": "yes"}})
         self.path.write_text(json.dumps(original))
         data = self.apply(action="read")
-        self.assertEqual(data["version"], 2)
+        self.assertEqual(data["version"], 3)
         self.assertEqual(data["entries"], original["entries"])
         self.assertEqual(data["habits"][0]["startDate"], START)
         self.assertEqual(data["habits"][0]["defaultAnswer"], "")
@@ -90,6 +91,113 @@ class StorageTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.add()
         self.assertEqual(self.path.read_text(), "{broken")
+
+    def test_v2_migration_preserves_preferences_and_automatic_history(self):
+        state, identity = self.add()
+        state["version"] = 2
+        state["preferences"] = {"weekStart": 7}
+        self.path.write_text(json.dumps(state))
+        data = self.apply(action="read")
+        self.assertEqual(data, {**state, "version": 3})
+        self.assertEqual(json.loads(Path(str(self.path) + ".v2.bak").read_text()), state)
+        self.assertTrue(data["automatic"][YESTERDAY][identity])
+
+    def test_undo_reverts_latest_answer_without_clobbering_another_write(self):
+        _, identity = self.add()
+        day = TODAY.isoformat()
+        result = {}
+        store.transact(self.path, dict(action="answer", id=identity, date=day, value="no"), result)
+        self.assertEqual(result["undo"]["before"], {"value": "", "automatic": False})
+        self.assertNotIn(day, self.apply(action="undo", **result["undo"])["entries"])
+        result.clear()
+        store.transact(self.path, dict(action="answer", id=identity, date=day, value="no"), result)
+        self.apply(action="answer", id=identity, date=day, value="yes")
+        with self.assertRaisesRegex(ValueError, "changed"):
+            self.apply(action="undo", **result["undo"])
+        self.assertEqual(self.apply(action="read")["entries"][day][identity], "yes")
+
+    def test_count_zero_clear_undo_and_target_change_preserve_history(self):
+        _, identity = self.add(kind="count", target=20, unit="pages")
+        day = TODAY.isoformat()
+        self.apply(action="answer", id=identity, date=day, value=0)
+        result = {}
+        store.transact(self.path, dict(action="answer", id=identity, date=day, value=22), result)
+        data = self.apply(action="undo", **result["undo"])
+        self.assertEqual(data["entries"][day][identity], 0)
+        self.assertEqual(data["automatic"], {})
+        self.assertEqual(data["habits"][0]["defaultAnswer"], "")
+        fields = dict(data["habits"][0], target=25)
+        self.assertEqual(self.apply(action="edit", **fields)["entries"][day][identity], 0)
+        for value in ("20", -1, 1_000_001, 1.5, True):
+            with self.assertRaises(ValueError):
+                self.apply(action="answer", id=identity, date=day, value=value)
+        with self.assertRaises(ValueError):
+            self.apply(action="edit", **dict(fields, kind="good"))
+        self.assertEqual(self.apply(action="answer", id=identity, date=day, value="")["entries"], {})
+
+    def test_archiving_preserves_answers_and_skips_defaults_during_pause(self):
+        _, identity = self.add()
+        day = TODAY.isoformat()
+        self.apply(action="answer", id=identity, date=day, value="yes")
+        frozen = self.apply(action="archive", id=identity)
+        self.assertEqual(frozen["entries"][day][identity], "yes")
+        self.assertEqual(frozen["selectedHabitId"], "")
+        self.assertTrue(store.archived(frozen["habits"][0]))
+        with self.assertRaises(ValueError):
+            self.apply(action="answer", id=identity, date=day, value="no")
+        self.assertFalse(store.archived(self.apply(action="restore", id=identity)["habits"][0]))
+        historical_pause = {"from": (TODAY - dt.timedelta(days=3)).isoformat(), "to": YESTERDAY}
+        frozen["habits"][0]["pauses"] = [historical_pause]
+        del frozen["entries"][historical_pause["from"]]
+        del frozen["automatic"][historical_pause["from"]]
+        self.path.write_text(json.dumps(frozen))
+        data = self.apply(action="read")
+        self.assertNotIn(historical_pause["from"], data["entries"])
+        self.assertEqual(data["entries"][YESTERDAY][identity], "no")
+
+    def test_exports_are_private_and_do_not_rewrite_tracker_data(self):
+        _, identity = self.add(name="=7+8", kind="count", target=4, unit="@units")
+        self.apply(action="answer", id=identity, date=TODAY.isoformat(), value=0)
+        state = self.apply(action="archive", id=identity)
+        before = self.path.read_bytes()
+        exports = {}
+        for fmt in ("csv", "json"):
+            result = {}
+            store.transact(self.path, dict(action="export", format=fmt), result)
+            dest = Path(result["exportPath"])
+            self.assertEqual(dest.parent.name, "habits-exports")
+            self.assertEqual(dest.stat().st_mode & 0o777, 0o600)
+            exports[fmt] = dest
+        row = next(csv.DictReader(exports["csv"].read_text().splitlines()))
+        self.assertEqual((row["habit"], row["value"], row["unit"], row["archived"]),
+                         ("'=7+8", "0", "'@units", "yes"))
+        self.assertEqual(json.loads(exports["json"].read_text()), state)
+        self.assertEqual(self.path.read_bytes(), before)
+
+    def test_ending_date_is_inclusive_and_stops_defaults(self):
+        cutoff = (TODAY - dt.timedelta(days=2)).isoformat()
+        state, identity = self.add(endDate=cutoff)
+        self.assertEqual(state["habits"][0]["endDate"], cutoff)
+        self.assertIn(identity, state["automatic"][cutoff])
+        self.assertNotIn(YESTERDAY, state["entries"])
+        with self.assertRaisesRegex(ValueError, "tracking dates"):
+            self.apply(action="answer", id=identity, date=YESTERDAY, value="yes")
+        state = self.apply(action="answer", id=identity, date=cutoff, value="yes")
+        self.assertEqual(state["entries"][cutoff][identity], "yes")
+        state = self.apply(action="edit", **dict(state["habits"][0], endDate=""))
+        self.assertEqual(state["entries"][cutoff][identity], "yes")
+        self.assertEqual(state["entries"][YESTERDAY][identity], "no")
+
+    def test_future_and_one_day_deadlines_and_nondestructive_edits(self):
+        future = (TODAY + dt.timedelta(days=6)).isoformat()
+        state, identity = self.add(endDate=future, defaultAnswer="")
+        self.apply(action="answer", id=identity, date=YESTERDAY, value="yes")
+        state = self.apply(action="edit", **dict(state["habits"][0], endDate=START))
+        self.assertEqual(state["habits"][0]["endDate"], START)
+        self.assertEqual(state["entries"][YESTERDAY][identity], "yes")
+        for value in (None, "2026-02-30", (TODAY - dt.timedelta(days=6)).isoformat()):
+            with self.assertRaises(ValueError):
+                self.apply(action="edit", **dict(state["habits"][0], endDate=value))
 
     def test_edit_fields_and_independent_start_dates(self):
         first, identity = self.add(defaultAnswer="")
@@ -151,12 +259,20 @@ class StorageTests(unittest.TestCase):
 
     def test_concurrent_writes_keep_every_habit(self):
         def add(index):
-            subprocess.run(["python3", str(SCRIPT), str(self.path),
-                json.dumps(dict(action="add", name=f"Habit {index}", kind="good"))],
+            subprocess.run(["python3", "-B", str(SCRIPT), str(self.path)],
+                input=json.dumps(dict(action="add", name=f"Habit {index}", kind="good")) + "\n",
                 capture_output=True, text=True, check=True)
         with concurrent.futures.ThreadPoolExecutor(max_workers=6) as pool:
             list(pool.map(add, range(12)))
         self.assertEqual(len(self.apply(action="read")["habits"]), 12)
+
+    def test_helper_rejects_missing_oversize_and_non_object_input(self):
+        for request in ("", "{}", "[]\n", "{\n", " " * (store.MAX_REQUEST + 1) + "\n"):
+            reply = subprocess.run(["python3", "-B", str(SCRIPT), str(self.path)],
+                                   input=request, capture_output=True, text=True)
+            self.assertEqual(reply.returncode, 1)
+            self.assertFalse(json.loads(reply.stdout)["ok"])
+            self.assertFalse(self.path.exists())
 
     def test_future_invalid_and_outside_window_days_refused(self):
         data, identity = self.add()

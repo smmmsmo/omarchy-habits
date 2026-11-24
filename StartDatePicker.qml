@@ -9,6 +9,9 @@ Flow {
   id: picker
   required property string dateKey
   required property string maximumDate
+  property string minimumDate: "1900-01-01"
+  property string fieldPrefix: "startDate"
+  property bool showToday: true
   required property var locale
   required property var translations
   property color foreground: Commons.Color.popups.text
@@ -20,8 +23,11 @@ Flow {
   property int secondarySize: Style.font.bodySmall
 
   readonly property var maximum: Model.dateParts(maximumDate)
+  readonly property var minimum: Model.dateParts(minimumDate)
   readonly property var current: Model.dateParts(dateKey) || maximum
   readonly property var limits: Model.dateLimits(current.year, current.month, maximum)
+  readonly property int firstMonth: current.year === minimum.year ? minimum.month : 1
+  readonly property int firstDay: current.year === minimum.year && current.month === minimum.month ? minimum.day : 1
   signal picked(string dateKey)
   signal fieldFocused(Item field)
 
@@ -34,6 +40,7 @@ Flow {
   function numberLabel(value) { return picker.locale.toString(value, "f", 0) }
   function selectPart(part, value) {
     var next = Model.changeDatePart(dateKey, maximumDate, part, value)
+    if (next < minimumDate) next = minimumDate
     if (next !== dateKey) picked(next)
   }
 
@@ -46,27 +53,27 @@ Flow {
     width: Math.min(picker.width, Math.max(255, Style.space(306)))
 
     DateField {
-      objectName: "startDateDay"
+      objectName: picker.fieldPrefix + "Day"
       title: picker.translations.t("day")
       width: fields.fieldSpace * 0.23
-      model: picker.makeOptions(1, picker.limits.day, 1, picker.numberLabel)
-      currentIndex: picker.current.day - 1
+      model: picker.makeOptions(picker.firstDay, picker.limits.day, 1, picker.numberLabel)
+      currentIndex: picker.current.day - picker.firstDay
       onActivated: function(index) { popup.close(); picker.selectPart("day", model[index].key) }
     }
     DateField {
-      objectName: "startDateMonth"
+      objectName: picker.fieldPrefix + "Month"
       title: picker.translations.t("month")
       width: fields.fieldSpace * 0.48
-      model: picker.makeOptions(1, picker.limits.month, 1,
+      model: picker.makeOptions(picker.firstMonth, picker.limits.month, 1,
         function(month) { return picker.locale.standaloneMonthName(month - 1, Locale.LongFormat) })
-      currentIndex: picker.current.month - 1
+      currentIndex: picker.current.month - picker.firstMonth
       onActivated: function(index) { popup.close(); picker.selectPart("month", model[index].key) }
     }
     DateField {
-      objectName: "startDateYear"
+      objectName: picker.fieldPrefix + "Year"
       title: picker.translations.t("year")
       width: fields.fieldSpace * 0.29
-      model: picker.makeOptions(picker.maximum.year, 1900, -1,
+      model: picker.makeOptions(picker.maximum.year, picker.minimum.year, -1,
         function(year) { return picker.locale.toString(new Date(year, 0, 1, 12), "yyyy") })
       currentIndex: picker.maximum.year - picker.current.year
       onActivated: function(index) { popup.close(); picker.selectPart("year", model[index].key) }
@@ -74,6 +81,7 @@ Flow {
   }
 
   Item {
+    visible: picker.showToday
     width: todayButton.implicitWidth
     height: fields.height
     Button {

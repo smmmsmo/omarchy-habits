@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+
+python3 -B tests/test_store.py
+node tests/model.test.cjs
+
+if command -v omarchy >/dev/null 2>&1; then
+  omarchy plugin validate .
+else
+  printf '%s\n' 'Skipping Omarchy manifest validation: omarchy is not installed.'
+fi

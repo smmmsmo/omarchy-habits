@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Developer-only Wayland smoke test; does not install the plugin or read personal state.
+set -euo pipefail
+repo=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+shell_dir="${OMARCHY_PATH:-/usr/share/omarchy}/shell"
+scratch=$(mktemp -d "${TMPDIR:-/tmp}/habits-demo.XXXXXXXX")
+trap 'rm -r -- "$scratch"' EXIT
+output=$(realpath -m -- "${1:-./habits-demo-output}")
+mkdir -p -- "$output" "$scratch/state"
+
+for cmd in quickshell python3 magick timeout; do
+  command -v "$cmd" >/dev/null || { printf 'Missing: %s\n' "$cmd" >&2; exit 1; }
+done
+test -n "${WAYLAND_DISPLAY:-}" || { printf '%s\n' 'Run this from a Wayland test session.' >&2; exit 1; }
+test -f "$shell_dir/Ui/qmldir" || { printf 'Missing Quattro modules: %s\n' "$shell_dir" >&2; exit 1; }
+
+ln -s -- "$shell_dir/Ui" "$scratch/Ui"
+ln -s -- "$shell_dir/Commons" "$scratch/Commons"
+ln -s -- "$repo" "$scratch/Plugin"
+cp -- "$repo/test/demo.qml" "$scratch/shell.qml"
+python3 -B "$repo/test/seed_demo.py" "$scratch/state"
+XDG_STATE_HOME="$scratch/state" HABITS_DEMO_DIR="$scratch" QML_DISABLE_DISK_CACHE=1 QT_QPA_PLATFORM=wayland \
+  timeout 25s quickshell --no-color -p "$scratch/shell.qml" > "$scratch/run.log" 2>&1 || {
+  cat "$scratch/run.log" >&2
+  exit 1
+}
+cat "$scratch/run.log"
+grep -q 'HABITS_DEMO_PASS' "$scratch/run.log"
+
+for view in today week year; do
+  bg='#1e2030'
+  if [[ $view == year ]]; then bg='#f5f6fb'; fi
+  # Item captures include only the widget, not the desktop. Flatten on the
+  # exact same surface color and add padding corresponding to the popout.
+  magick "$scratch/$view.png" -background "$bg" -alpha remove -alpha off \
+    -bordercolor "$bg" -border 22 -strip "$scratch/$view-flat.png"
+done
+width=$(magick identify -format '%w' "$scratch/today-flat.png")
+magick -size "${width}x39" xc:'#181a27' "$scratch/bar.png" \
+  -gravity center -compose over -composite "$scratch/today-flat.png" \
+  -append -strip "$output/preview.png"
+cp -- "$scratch/week-flat.png" "$output/week.png"
+cp -- "$scratch/year-flat.png" "$output/year.png"
+printf 'Demo captures: %s\n' "$output"

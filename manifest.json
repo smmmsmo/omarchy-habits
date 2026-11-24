@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "mo.habits",
   "name": "Habit Tracker",
-  "version": "1.4.1",
+  "version": "1.6.4",
   "author": "mo",
   "license": "MIT",
-  "description": "Private yes/no check-ins, monthly calendars, and per-habit recovery analysis.",
+  "description": "Offline habit check-ins, optional deadlines, numeric targets, calendars, and recovery analysis.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,9 +14,9 @@
   },
   "barWidget": {
     "displayName": "Habit Tracker",
-    "description": "Build or quit habits with custom questions, automatic answers, monthly calendars, and individual progress reports.",
+    "description": "Check in across your habits, track deadlines and numeric targets, and review week, month, and year views.",
     "category": "Wellness",
     "allowMultiple": false,
-    "defaultSection": "centerEnd"
+    "defaultSection": "right"
   }
 }

@@ -1,2 +1,8 @@
 __pycache__/
 *.pyc
+/habits.json*
+/habits-exports/
+/shell.json
+/.env
+/.env.*
+/habits-demo-output/
